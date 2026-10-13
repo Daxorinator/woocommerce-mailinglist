@@ -30,4 +30,9 @@ unzip -l "$zip_path" | grep -q 'mailinglist-plugin/mailinglist-plugin.php' || {
 	exit 1
 }
 
+unzip -l "$zip_path" | grep -q 'mailinglist-plugin/lib/plugin-update-checker/plugin-update-checker.php' || {
+	echo "Bundled update checker missing from the zip" >&2
+	exit 1
+}
+
 echo "$zip_path"

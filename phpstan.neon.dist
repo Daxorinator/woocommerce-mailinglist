@@ -7,6 +7,8 @@ parameters:
         - mailinglist-plugin.php
         - uninstall.php
         - includes
+    scanDirectories:
+        - lib
     scanFiles:
         - vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
     bootstrapFiles:
