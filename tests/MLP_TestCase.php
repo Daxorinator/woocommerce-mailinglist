@@ -8,6 +8,7 @@ abstract class MLP_TestCase extends WP_UnitTestCase {
 		parent::set_up();
 
 		$GLOBALS['mlp_test_subscriptions'] = array();
+		$GLOBALS['mlp_test_subscription_products'] = array();
 
 		// Queue tests drive the WP-Cron path; the Action Scheduler path has its own test.
 		add_filter( 'mlp_use_action_scheduler', '__return_false' );
