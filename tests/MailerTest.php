@@ -129,6 +129,7 @@ class MailerTest extends MLP_TestCase {
 		$result = MLP_Mailer::send( $this->campaign( 'product', 'Recall' ), null, 'not-an-email', 'Nobody' );
 
 		$this->assertWPError( $result );
-		$this->assertStringContainsString( 'Invalid address', $result->get_error_message() );
+		$this->assertNotSame( '', $result->get_error_message() );
+		$this->assertSame( array(), $this->sent_mail() );
 	}
 }

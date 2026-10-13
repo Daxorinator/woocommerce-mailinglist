@@ -56,7 +56,7 @@ class QueueCampaignsTest extends MLP_TestCase {
 		MLP_Campaigns::start( $id );
 
 		$this->assertWPError( MLP_Campaigns::start( $id ) );
-		$this->assertSame( 3, MLP_Campaigns::get( $id )->total );
+		$this->assertSame( 3, (int) MLP_Campaigns::get( $id )->total );
 	}
 
 	public function test_empty_subject_content_or_list_blocks_sending() {

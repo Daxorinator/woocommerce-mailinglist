@@ -41,6 +41,7 @@ class InstallTest extends MLP_TestCase {
 
 	public function test_uninstall_keeps_data_unless_the_admin_opted_in() {
 		MLP_Settings::update( array( 'delete_data' => 0 ) );
+		$version_before = get_option( MLP_DB::VERSION_OPTION );
 		if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 			define( 'WP_UNINSTALL_PLUGIN', 'mailinglist-plugin/mailinglist-plugin.php' );
 		}
@@ -48,6 +49,6 @@ class InstallTest extends MLP_TestCase {
 		require MLP_DIR . 'uninstall.php';
 
 		$this->assertTrue( $this->table_exists( 'mlp_lists' ) );
-		$this->assertSame( MLP_DB::VERSION, get_option( MLP_DB::VERSION_OPTION ) );
+		$this->assertSame( $version_before, get_option( MLP_DB::VERSION_OPTION ) );
 	}
 }

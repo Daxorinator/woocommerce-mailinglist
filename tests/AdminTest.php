@@ -7,7 +7,10 @@ class AdminTest extends MLP_TestCase {
 	public function set_up() {
 		parent::set_up();
 
+		// The plugin registers its admin hooks only for is_admin() requests, which this process is not.
 		require_once MLP_DIR . 'includes/class-mlp-admin.php';
+		MLP_Admin::init();
+
 		$this->admin_id = self::factory()->user->create( array( 'role' => 'administrator' ) );
 		wp_set_current_user( $this->admin_id );
 
