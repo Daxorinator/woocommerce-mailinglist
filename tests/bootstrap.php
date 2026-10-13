@@ -57,3 +57,6 @@ $wpdb->query(
 if ( class_exists( 'WC_Install' ) ) {
 	WC_Install::install();
 }
+
+// Base class for the plugin's tests; needs WP_UnitTestCase, which exists once WordPress is loaded.
+require_once __DIR__ . '/MLP_TestCase.php';
