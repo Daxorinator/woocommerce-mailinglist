@@ -1,0 +1,57 @@
+.mlp-badge {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 10px;
+	font-size: 12px;
+	line-height: 1.6;
+	white-space: nowrap;
+}
+
+.mlp-badge-marketing {
+	background: #e5f5fa;
+	color: #0a4b78;
+}
+
+.mlp-badge-product {
+	background: #fcf0e1;
+	color: #8a4b00;
+}
+
+.mlp-error {
+	color: #b32d2e;
+}
+
+.mlp-inline {
+	display: inline-block;
+	margin: 0 16px 6px 0;
+}
+
+.mlp-format {
+	margin-bottom: 10px;
+}
+
+#mlp-editor-html .CodeMirror {
+	height: 480px;
+	border: 1px solid #c3c4c7;
+}
+
+#mlp-preview-frame {
+	width: 100%;
+	max-width: 800px;
+	height: 600px;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+}
+
+.mlp-summary {
+	max-width: 600px;
+}
+
+.mlp-summary th {
+	width: 200px;
+	font-weight: 600;
+}
+
+#mlp-ajax-status {
+	margin-left: 8px;
+}
