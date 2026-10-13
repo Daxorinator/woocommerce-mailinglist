@@ -1,0 +1,35 @@
+{
+	"name": "daxorinator/woocommerce-mailinglist",
+	"description": "WordPress plugin: mailing lists from WPForms entries or WooCommerce data, with bulk sending via wp_mail().",
+	"type": "wordpress-plugin",
+	"license": "MIT",
+	"require": {
+		"php": ">=7.4"
+	},
+	"require-dev": {
+		"dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+		"php-stubs/woocommerce-stubs": "^9.0",
+		"phpstan/phpstan": "^2.0",
+		"phpunit/phpunit": "^9.6",
+		"szepeviktor/phpstan-wordpress": "^2.0",
+		"wp-coding-standards/wpcs": "^3.0",
+		"wp-phpunit/wp-phpunit": "*",
+		"yoast/phpunit-polyfills": "^2.0"
+	},
+	"config": {
+		"platform": {
+			"php": "7.4.33"
+		},
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true,
+			"phpstan/extension-installer": true
+		},
+		"sort-packages": true
+	},
+	"scripts": {
+		"lint": "! find . -path ./vendor -prune -o -path ./.git -prune -o -name '*.php' -print0 | xargs -0 -n1 php -l -n 2>&1 | grep -v '^No syntax errors detected' | grep .",
+		"phpcs": "phpcs",
+		"phpstan": "phpstan analyse --memory-limit=1G",
+		"test": "phpunit"
+	}
+}

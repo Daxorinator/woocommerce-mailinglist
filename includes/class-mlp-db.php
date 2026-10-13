@@ -110,7 +110,7 @@ class MLP_DB {
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::table( 'unsubscribes' ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( ! get_option( 'mlp_secret' ) ) {
-			add_option( 'mlp_secret', wp_generate_password( 64, false ), '', 'no' );
+			add_option( 'mlp_secret', wp_generate_password( 64, false ), '', false );
 		}
 
 		update_option( self::VERSION_OPTION, self::VERSION );

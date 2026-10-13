@@ -19,10 +19,6 @@ class MLP_Admin {
 		}
 	}
 
-	/* ---------------------------------------------------------------------
-	 * Helpers
-	 * ------------------------------------------------------------------- */
-
 	private static function url( $page, $args = array() ) {
 		return add_query_arg( array_merge( array( 'page' => $page ), $args ), admin_url( 'admin.php' ) );
 	}
@@ -35,11 +31,10 @@ class MLP_Admin {
 		return isset( $_GET['page'] ) && 0 === strpos( sanitize_key( $_GET['page'] ), 'mlp-' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 	}
 
-	private static function guard( $nonce_action ) {
+	private static function require_capability() {
 		if ( ! current_user_can( mlp_capability() ) ) {
 			wp_die( esc_html__( 'You are not allowed to do this.', 'mailinglist-plugin' ), 403 );
 		}
-		check_admin_referer( $nonce_action );
 	}
 
 	private static function notice( $message, $type = 'success' ) {
@@ -98,10 +93,6 @@ class MLP_Admin {
 		return array( $body, $format );
 	}
 
-	/* ---------------------------------------------------------------------
-	 * Menu and assets
-	 * ------------------------------------------------------------------- */
-
 	public static function menu() {
 		$cap = mlp_capability();
 		add_menu_page( __( 'Mailing Lists', 'mailinglist-plugin' ), __( 'Mailing Lists', 'mailinglist-plugin' ), $cap, 'mlp-lists', array( __CLASS__, 'page_lists' ), 'dashicons-email-alt', 56 );
@@ -116,7 +107,7 @@ class MLP_Admin {
 		if ( ! self::is_plugin_page() ) {
 			return;
 		}
-		$page = sanitize_key( $_GET['page'] ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$page = isset( $_GET['page'] ) ? sanitize_key( $_GET['page'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 
 		wp_enqueue_style( 'mlp-admin', MLP_URL . 'assets/admin.css', array(), MLP_VERSION );
 		wp_enqueue_script( 'mlp-admin', MLP_URL . 'assets/admin.js', array( 'jquery' ), MLP_VERSION, true );
@@ -156,10 +147,6 @@ class MLP_Admin {
 
 		wp_localize_script( 'mlp-admin', 'MLP', $data );
 	}
-
-	/* ---------------------------------------------------------------------
-	 * Lists
-	 * ------------------------------------------------------------------- */
 
 	public static function page_lists() {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
@@ -228,8 +215,8 @@ class MLP_Admin {
 		}
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
-		$search   = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '';
-		$page     = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
+		$search = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( $_GET['s'] ) ) : '';
+		$page   = isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
 		// phpcs:enable
 		$per_page = 50;
 		$total    = MLP_Lists::count_members( $list->id, $search );
@@ -321,7 +308,7 @@ class MLP_Admin {
 			<h1><?php echo esc_html( $list ? __( 'Edit Mailing List', 'mailinglist-plugin' ) : __( 'Add Mailing List', 'mailinglist-plugin' ) ); ?></h1>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 				<input type="hidden" name="action" value="mlp_save_list">
-				<input type="hidden" name="list_id" value="<?php echo esc_attr( $list ? $list->id : 0 ); ?>">
+				<input type="hidden" name="list_id" value="<?php echo esc_attr( (string) ( $list ? $list->id : 0 ) ); ?>">
 				<?php wp_nonce_field( 'mlp_save_list' ); ?>
 
 				<table class="form-table" role="presentation">
@@ -347,7 +334,9 @@ class MLP_Admin {
 						</td>
 					</tr>
 
-					<?php // Marketing: WPForms. ?>
+					<?php
+					// Marketing: WPForms.
+					?>
 					<?php if ( ! $has_wpforms ) : ?>
 						<tr class="mlp-source-marketing"><th></th><td><div class="notice notice-warning inline"><p><?php esc_html_e( 'WPForms is not active. Marketing lists need WPForms Pro, which stores form entries.', 'mailinglist-plugin' ); ?></p></div></td></tr>
 					<?php elseif ( ! MLP_Source_WPForms::has_entry_storage() ) : ?>
@@ -359,7 +348,7 @@ class MLP_Admin {
 							<select id="mlp_form_id" name="config[form_id]">
 								<option value="0"><?php esc_html_e( '— Select a form —', 'mailinglist-plugin' ); ?></option>
 								<?php foreach ( $forms as $form ) : ?>
-									<option value="<?php echo esc_attr( $form->ID ); ?>" <?php selected( $mk['form_id'], $form->ID ); ?>><?php echo esc_html( $form->post_title . ' (#' . $form->ID . ')' ); ?></option>
+									<option value="<?php echo esc_attr( (string) $form->ID ); ?>" <?php selected( $mk['form_id'], $form->ID ); ?>><?php echo esc_html( $form->post_title . ' (#' . $form->ID . ')' ); ?></option>
 								<?php endforeach; ?>
 							</select>
 							<p class="description"><?php esc_html_e( 'The list contains the email address from every entry submitted to this form (spam, trashed and partial entries are ignored).', 'mailinglist-plugin' ); ?></p>
@@ -393,7 +382,9 @@ class MLP_Admin {
 						</td>
 					</tr>
 
-					<?php // Product: WooCommerce. ?>
+					<?php
+					// Product: WooCommerce.
+					?>
 					<?php if ( ! $has_wc ) : ?>
 						<tr class="mlp-source-product"><th></th><td><div class="notice notice-warning inline"><p><?php esc_html_e( 'WooCommerce is not active. Product lists need WooCommerce.', 'mailinglist-plugin' ); ?></p></div></td></tr>
 					<?php endif; ?>
@@ -461,7 +452,8 @@ class MLP_Admin {
 	}
 
 	public static function handle_save_list() {
-		self::guard( 'mlp_save_list' );
+		self::require_capability();
+		check_admin_referer( 'mlp_save_list' );
 
 		// phpcs:disable WordPress.Security.ValidatedSanitizedInput -- sanitised in MLP_Lists::save().
 		$list_id = isset( $_POST['list_id'] ) ? absint( $_POST['list_id'] ) : 0;
@@ -488,7 +480,8 @@ class MLP_Admin {
 	}
 
 	public static function handle_refresh_list() {
-		self::guard( 'mlp_refresh_list' );
+		self::require_capability();
+		check_admin_referer( 'mlp_refresh_list' );
 		$list = MLP_Lists::get( isset( $_GET['list'] ) ? absint( $_GET['list'] ) : 0 );
 		if ( $list ) {
 			$refresh = MLP_Refresher::refresh_list( $list );
@@ -503,7 +496,8 @@ class MLP_Admin {
 	}
 
 	public static function handle_delete_list() {
-		self::guard( 'mlp_delete_list' );
+		self::require_capability();
+		check_admin_referer( 'mlp_delete_list' );
 		$list_id = isset( $_GET['list'] ) ? absint( $_GET['list'] ) : 0;
 		if ( $list_id ) {
 			MLP_Lists::delete( $list_id );
@@ -519,10 +513,6 @@ class MLP_Admin {
 		}
 		wp_send_json_success( MLP_Source_WPForms::get_form_fields( isset( $_POST['form_id'] ) ? absint( $_POST['form_id'] ) : 0 ) );
 	}
-
-	/* ---------------------------------------------------------------------
-	 * Compose
-	 * ------------------------------------------------------------------- */
 
 	public static function page_compose() {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
@@ -556,7 +546,7 @@ class MLP_Admin {
 
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" id="mlp-compose-form">
 				<input type="hidden" name="action" value="mlp_save_campaign">
-				<input type="hidden" name="campaign_id" value="<?php echo esc_attr( $campaign ? $campaign->id : 0 ); ?>">
+				<input type="hidden" name="campaign_id" value="<?php echo esc_attr( (string) ( $campaign ? $campaign->id : 0 ) ); ?>">
 				<?php wp_nonce_field( 'mlp_save_campaign' ); ?>
 
 				<table class="form-table" role="presentation">
@@ -573,7 +563,7 @@ class MLP_Admin {
 					<tr>
 						<th scope="row"><label for="mlp_list_id"><?php esc_html_e( 'Mailing list', 'mailinglist-plugin' ); ?></label></th>
 						<td>
-							<select id="mlp_list_id" name="list_id" data-current="<?php echo esc_attr( $list_id ); ?>">
+							<select id="mlp_list_id" name="list_id" data-current="<?php echo esc_attr( (string) $list_id ); ?>">
 								<?php foreach ( $lists as $list ) : ?>
 									<option value="<?php echo esc_attr( $list->id ); ?>" <?php selected( $list_id, $list->id ); ?>><?php echo esc_html( $list->name . ' — ' . MLP_Lists::type_label( $list->type ) . ' (' . number_format_i18n( $list->member_count ) . ')' ); ?></option>
 								<?php endforeach; ?>
@@ -646,7 +636,8 @@ class MLP_Admin {
 	}
 
 	public static function handle_save_campaign() {
-		self::guard( 'mlp_save_campaign' );
+		self::require_capability();
+		check_admin_referer( 'mlp_save_campaign' );
 
 		list( $body, $format ) = self::read_body();
 		$campaign_id           = isset( $_POST['campaign_id'] ) ? absint( $_POST['campaign_id'] ) : 0;
@@ -756,10 +747,6 @@ class MLP_Admin {
 		wp_send_json_success( sprintf( __( 'Test email sent to %s.', 'mailinglist-plugin' ), $to ) );
 	}
 
-	/* ---------------------------------------------------------------------
-	 * Campaigns
-	 * ------------------------------------------------------------------- */
-
 	public static function page_campaigns() {
 		if ( isset( $_GET['view'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			self::page_campaign_view( absint( $_GET['view'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -803,14 +790,62 @@ class MLP_Admin {
 							<div class="row-actions">
 								<span><a href="<?php echo esc_url( $main_url ); ?>"><?php echo esc_html( $is_draft ? __( 'Edit', 'mailinglist-plugin' ) : __( 'View', 'mailinglist-plugin' ) ); ?></a> | </span>
 								<?php if ( 'sending' === $campaign->status ) : ?>
-									<span><a href="<?php echo esc_url( self::action_url( 'campaign_action', array( 'do' => 'cancel', 'campaign' => $campaign->id ) ) ); ?>" class="mlp-confirm" data-confirm="<?php esc_attr_e( 'Stop sending this email? Emails already sent cannot be recalled.', 'mailinglist-plugin' ); ?>"><?php esc_html_e( 'Cancel sending', 'mailinglist-plugin' ); ?></a> | </span>
+									<span><a href="
+									<?php
+									echo esc_url(
+										self::action_url(
+											'campaign_action',
+											array(
+												'do'       => 'cancel',
+												'campaign' => $campaign->id,
+											)
+										)
+									);
+									?>
+													" class="mlp-confirm" data-confirm="<?php esc_attr_e( 'Stop sending this email? Emails already sent cannot be recalled.', 'mailinglist-plugin' ); ?>"><?php esc_html_e( 'Cancel sending', 'mailinglist-plugin' ); ?></a> | </span>
 								<?php endif; ?>
 								<?php if ( $campaign->failed > 0 && in_array( $campaign->status, array( 'sent', 'sending' ), true ) ) : ?>
-									<span><a href="<?php echo esc_url( self::action_url( 'campaign_action', array( 'do' => 'retry', 'campaign' => $campaign->id ) ) ); ?>"><?php esc_html_e( 'Retry failed', 'mailinglist-plugin' ); ?></a> | </span>
+									<span><a href="
+									<?php
+									echo esc_url(
+										self::action_url(
+											'campaign_action',
+											array(
+												'do'       => 'retry',
+												'campaign' => $campaign->id,
+											)
+										)
+									);
+									?>
+													"><?php esc_html_e( 'Retry failed', 'mailinglist-plugin' ); ?></a> | </span>
 								<?php endif; ?>
-								<span><a href="<?php echo esc_url( self::action_url( 'campaign_action', array( 'do' => 'duplicate', 'campaign' => $campaign->id ) ) ); ?>"><?php esc_html_e( 'Duplicate', 'mailinglist-plugin' ); ?></a></span>
+								<span><a href="
+								<?php
+								echo esc_url(
+									self::action_url(
+										'campaign_action',
+										array(
+											'do'       => 'duplicate',
+											'campaign' => $campaign->id,
+										)
+									)
+								);
+								?>
+												"><?php esc_html_e( 'Duplicate', 'mailinglist-plugin' ); ?></a></span>
 								<?php if ( 'sending' !== $campaign->status ) : ?>
-									<span class="delete"> | <a href="<?php echo esc_url( self::action_url( 'campaign_action', array( 'do' => 'delete', 'campaign' => $campaign->id ) ) ); ?>" class="mlp-confirm" data-confirm="<?php esc_attr_e( 'Delete this email and its delivery log?', 'mailinglist-plugin' ); ?>"><?php esc_html_e( 'Delete', 'mailinglist-plugin' ); ?></a></span>
+									<span class="delete"> | <a href="
+									<?php
+									echo esc_url(
+										self::action_url(
+											'campaign_action',
+											array(
+												'do'       => 'delete',
+												'campaign' => $campaign->id,
+											)
+										)
+									);
+									?>
+																		" class="mlp-confirm" data-confirm="<?php esc_attr_e( 'Delete this email and its delivery log?', 'mailinglist-plugin' ); ?>"><?php esc_html_e( 'Delete', 'mailinglist-plugin' ); ?></a></span>
 								<?php endif; ?>
 							</div>
 						</td>
@@ -852,11 +887,11 @@ class MLP_Admin {
 		$failed   = MLP_Campaigns::get_failed( $campaign->id );
 		$user     = wp_get_current_user();
 		$labels   = array(
-			'sent'         => __( 'Sent', 'mailinglist-plugin' ),
-			'pending'      => __( 'Waiting', 'mailinglist-plugin' ),
-			'sending'      => __( 'In progress', 'mailinglist-plugin' ),
-			'failed'       => __( 'Failed', 'mailinglist-plugin' ),
-			'cancelled'    => __( 'Cancelled', 'mailinglist-plugin' ),
+			'sent'      => __( 'Sent', 'mailinglist-plugin' ),
+			'pending'   => __( 'Waiting', 'mailinglist-plugin' ),
+			'sending'   => __( 'In progress', 'mailinglist-plugin' ),
+			'failed'    => __( 'Failed', 'mailinglist-plugin' ),
+			'cancelled' => __( 'Cancelled', 'mailinglist-plugin' ),
 		);
 
 		list( $subject, $html ) = MLP_Mailer::render( $campaign, $user->user_email, $user->display_name, '#' );
@@ -881,7 +916,19 @@ class MLP_Admin {
 
 			<?php if ( $failed ) : ?>
 				<h2><?php esc_html_e( 'Failed recipients', 'mailinglist-plugin' ); ?></h2>
-				<p><a class="button" href="<?php echo esc_url( self::action_url( 'campaign_action', array( 'do' => 'retry', 'campaign' => $campaign->id ) ) ); ?>"><?php esc_html_e( 'Retry failed', 'mailinglist-plugin' ); ?></a></p>
+				<p><a class="button" href="
+				<?php
+				echo esc_url(
+					self::action_url(
+						'campaign_action',
+						array(
+							'do'       => 'retry',
+							'campaign' => $campaign->id,
+						)
+					)
+				);
+				?>
+											"><?php esc_html_e( 'Retry failed', 'mailinglist-plugin' ); ?></a></p>
 				<table class="wp-list-table widefat fixed striped">
 					<thead><tr><th><?php esc_html_e( 'Email', 'mailinglist-plugin' ); ?></th><th><?php esc_html_e( 'Error', 'mailinglist-plugin' ); ?></th></tr></thead>
 					<tbody>
@@ -900,7 +947,8 @@ class MLP_Admin {
 	}
 
 	public static function handle_campaign_action() {
-		self::guard( 'mlp_campaign_action' );
+		self::require_capability();
+		check_admin_referer( 'mlp_campaign_action' );
 
 		$id = isset( $_GET['campaign'] ) ? absint( $_GET['campaign'] ) : 0;
 		$do = isset( $_GET['do'] ) ? sanitize_key( $_GET['do'] ) : '';
@@ -937,10 +985,6 @@ class MLP_Admin {
 
 		self::redirect( self::url( 'mlp-campaigns' ) );
 	}
-
-	/* ---------------------------------------------------------------------
-	 * Settings
-	 * ------------------------------------------------------------------- */
 
 	public static function page_settings() {
 		$s = MLP_Settings::get();
@@ -1005,7 +1049,8 @@ class MLP_Admin {
 	}
 
 	public static function handle_save_settings() {
-		self::guard( 'mlp_save_settings' );
+		self::require_capability();
+		check_admin_referer( 'mlp_save_settings' );
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput -- sanitised in MLP_Settings::update().
 		MLP_Settings::update( isset( $_POST['settings'] ) && is_array( $_POST['settings'] ) ? wp_unslash( $_POST['settings'] ) : array() );
 		self::notice( __( 'Settings saved.', 'mailinglist-plugin' ) );

@@ -50,9 +50,9 @@ class MLP_Lists {
 	}
 
 	private static function hydrate( $row ) {
-		$config          = json_decode( (string) $row->config, true );
-		$row->config     = is_array( $config ) ? $config : array();
-		$row->id         = (int) $row->id;
+		$config            = json_decode( (string) $row->config, true );
+		$row->config       = is_array( $config ) ? $config : array();
+		$row->id           = (int) $row->id;
 		$row->member_count = (int) $row->member_count;
 		return $row;
 	}

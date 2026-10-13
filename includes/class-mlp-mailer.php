@@ -183,9 +183,18 @@ class MLP_Mailer {
 		self::$alt_body = '';
 
 		if ( ! $sent ) {
-			return new WP_Error( 'mlp_send_failed', self::$last_error ? self::$last_error : __( 'wp_mail() reported a failure.', 'mailinglist-plugin' ) );
+			return new WP_Error( 'mlp_send_failed', self::captured_error() );
 		}
 		return true;
+	}
+
+	/**
+	 * The error wp_mail_failed reported during the last send, or a generic one.
+	 *
+	 * @return string
+	 */
+	private static function captured_error() {
+		return self::$last_error ? self::$last_error : __( 'wp_mail() reported a failure.', 'mailinglist-plugin' );
 	}
 
 	public static function capture_error( $error ) {

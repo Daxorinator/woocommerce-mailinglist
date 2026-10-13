@@ -124,14 +124,17 @@ class MLP_Unsubscribe {
 
 		if ( ! $email || ! $token || ! hash_equals( self::token( $list_id, $email ), $token ) ) {
 			self::render_page( __( 'Invalid link', 'mailinglist-plugin' ), __( 'This unsubscribe link is invalid or incomplete.', 'mailinglist-plugin' ), 400 );
+			return;
 		}
 
 		$list = MLP_Lists::get( $list_id );
 		if ( ! $list ) {
 			self::render_page( __( 'Unsubscribed', 'mailinglist-plugin' ), __( 'This mailing list no longer exists. You will not receive any further emails from it.', 'mailinglist-plugin' ) );
+			return;
 		}
 		if ( MLP_Lists::TYPE_MARKETING !== $list->type ) {
 			self::render_page( __( 'Cannot unsubscribe', 'mailinglist-plugin' ), __( 'It is not possible to unsubscribe from this type of email.', 'mailinglist-plugin' ), 400 );
+			return;
 		}
 
 		if ( $is_post ) {
@@ -141,6 +144,7 @@ class MLP_Unsubscribe {
 				/* translators: %s: email address */
 				sprintf( __( '%s has been unsubscribed and will no longer receive these emails.', 'mailinglist-plugin' ), $email )
 			);
+			return;
 		}
 
 		$form = sprintf(
@@ -166,10 +170,12 @@ class MLP_Unsubscribe {
 	 * @param string $extra   Trusted extra HTML.
 	 */
 	private static function render_page( $title, $message, $status = 200, $extra = '' ) {
-		status_header( $status );
-		nocache_headers();
-		header( 'Content-Type: text/html; charset=' . get_bloginfo( 'charset' ) );
-		header( 'X-Robots-Tag: noindex, nofollow' );
+		if ( ! headers_sent() ) {
+			status_header( $status );
+			nocache_headers();
+			header( 'Content-Type: text/html; charset=' . get_bloginfo( 'charset' ) );
+			header( 'X-Robots-Tag: noindex, nofollow' );
+		}
 		?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
@@ -197,6 +203,14 @@ a{color:#2271b1;}
 </body>
 </html>
 		<?php
-		exit;
+
+		/**
+		 * Whether to stop the request after the page is output. Tests return false.
+		 *
+		 * @param bool $exit Default true.
+		 */
+		if ( apply_filters( 'mlp_unsubscribe_exit', true ) ) {
+			exit;
+		}
 	}
 }

@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<phpunit
+	bootstrap="tests/bootstrap.php"
+	backupGlobals="false"
+	colors="true"
+	convertErrorsToExceptions="true"
+	convertNoticesToExceptions="true"
+	convertWarningsToExceptions="true"
+	convertDeprecationsToExceptions="false"
+	>
+	<testsuites>
+		<testsuite name="mailinglist-plugin">
+			<directory suffix="Test.php">tests</directory>
+		</testsuite>
+	</testsuites>
+</phpunit>
