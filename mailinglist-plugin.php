@@ -27,6 +27,9 @@ require_once MLP_DIR . 'includes/class-mlp-unsubscribe.php';
 require_once MLP_DIR . 'includes/class-mlp-mailer.php';
 require_once MLP_DIR . 'includes/class-mlp-campaigns.php';
 require_once MLP_DIR . 'includes/class-mlp-queue.php';
+require_once MLP_DIR . 'includes/class-mlp-updater.php';
+
+MLP_Updater::init();
 
 /**
  * Capability required to manage lists and send email.

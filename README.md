@@ -109,3 +109,7 @@ The `Release` workflow re-runs CI, checks the tag matches the plugin version, bu
 ## License
 
 [MIT](LICENSE)
+
+## Updates
+
+The plugin updates itself from this repository's GitHub releases (via the bundled [Plugin Update Checker](https://github.com/YahnisElsts/plugin-update-checker) in `lib/`). New versions appear under **Plugins** like any other update, and WordPress auto-updates can be enabled for it. To publish a release, bump the version in `mailinglist-plugin.php` (header and `MLP_VERSION`), merge, and push a matching `vN.N.N` tag; the release workflow attaches the installable zip that sites download.
