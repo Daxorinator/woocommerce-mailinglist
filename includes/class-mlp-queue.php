@@ -17,7 +17,14 @@ class MLP_Queue {
 	const STALE_AFTER = 900;
 
 	private static function use_action_scheduler() {
-		return function_exists( 'as_schedule_single_action' ) && function_exists( 'as_next_scheduled_action' ) && did_action( 'action_scheduler_init' );
+		$available = function_exists( 'as_schedule_single_action' ) && function_exists( 'as_next_scheduled_action' ) && did_action( 'action_scheduler_init' );
+
+		/**
+		 * Whether to queue send batches with Action Scheduler (true) or WP-Cron (false).
+		 *
+		 * @param bool $available True when Action Scheduler is loaded and initialised.
+		 */
+		return (bool) apply_filters( 'mlp_use_action_scheduler', $available );
 	}
 
 	/**
@@ -65,7 +72,7 @@ class MLP_Queue {
 	}
 
 	private static function acquire_lock() {
-		if ( add_option( self::LOCK_OPTION, time(), '', 'no' ) ) {
+		if ( add_option( self::LOCK_OPTION, time(), '', false ) ) {
 			return true;
 		}
 		$locked_at = (int) get_option( self::LOCK_OPTION );

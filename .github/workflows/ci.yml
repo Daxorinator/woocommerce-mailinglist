@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'ci/**']
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint & static analysis (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.4', '8.4']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: PHP syntax
+        run: composer lint
+
+      - name: Coding standards
+        run: composer phpcs
+
+      - name: Static analysis
+        if: matrix.php == '8.4'
+        run: composer phpstan
+
+      - name: JavaScript syntax
+        if: matrix.php == '8.4'
+        run: node --check assets/admin.js
+
+  unit-tests:
+    name: Unit tests (PHP ${{ matrix.php }}, WP ${{ matrix.wp }}${{ matrix.woocommerce == 'no' && ', no WooCommerce' || '' }})
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.experimental == true }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { php: '7.4', wp: 'latest', woocommerce: 'yes' }
+          - { php: '8.1', wp: 'latest', woocommerce: 'yes' }
+          - { php: '8.3', wp: 'latest', woocommerce: 'yes' }
+          - { php: '8.4', wp: 'latest', woocommerce: 'yes' }
+          # The plugin's declared minimum WordPress version (also the oldest whose test library supports
+          # PHPUnit 9). WooCommerce no longer loads on it, so this cell covers the WPForms-only path.
+          - { php: '7.4', wp: '5.9', woocommerce: 'no', wp_phpunit: '5.9.*' }
+          - { php: '8.3', wp: 'nightly', woocommerce: 'yes', experimental: true }
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --host=127.0.0.1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      WP_CORE_DIR: /tmp/wordpress
+      WP_DB_HOST: 127.0.0.1
+      WP_DB_USER: root
+      WP_DB_PASSWORD: ''
+      WP_DB_NAME: wordpress_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli
+          tools: composer
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Use the test library that matches this WordPress version
+        if: matrix.wp_phpunit
+        run: |
+          composer require --dev --no-interaction --no-progress --no-update "wp-phpunit/wp-phpunit:${{ matrix.wp_phpunit }}"
+          composer update --no-interaction --no-progress --with-all-dependencies wp-phpunit/wp-phpunit
+
+      - name: Install WordPress${{ matrix.woocommerce == 'yes' && ' and WooCommerce' || '' }}
+        run: bin/install-wp.sh "${{ matrix.wp }}" "${{ matrix.woocommerce }}"
+
+      - name: Run tests
+        env:
+          MLP_SKIP_WOOCOMMERCE: ${{ matrix.woocommerce == 'no' && '1' || '' }}
+        run: |
+          if [ "${{ matrix.woocommerce }}" = "no" ]; then
+            vendor/bin/phpunit --exclude-group woocommerce
+          else
+            vendor/bin/phpunit
+          fi
+
+  e2e-tests:
+    name: End-to-end tests (PHP ${{ matrix.php }}, WP ${{ matrix.wp }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Real site over HTTP: the public unsubscribe endpoint.
+          - { php: '8.3', wp: 'latest' }
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --host=127.0.0.1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli
+          coverage: none
+
+      - name: Run end-to-end tests
+        env:
+          E2E_WP_VERSION: ${{ matrix.wp }}
+        run: bin/e2e-http.sh

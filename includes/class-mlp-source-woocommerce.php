@@ -32,7 +32,8 @@ class MLP_Source_WooCommerce {
 		$statuses = array();
 		if ( function_exists( 'wc_get_order_statuses' ) ) {
 			foreach ( wc_get_order_statuses() as $key => $label ) {
-				$statuses[ 0 === strpos( $key, 'wc-' ) ? substr( $key, 3 ) : $key ] = $label;
+				$slug              = 0 === strpos( $key, 'wc-' ) ? substr( $key, 3 ) : $key;
+				$statuses[ $slug ] = $label;
 			}
 		}
 		if ( ! $statuses ) {
@@ -162,7 +163,8 @@ class MLP_Source_WooCommerce {
 				}
 			}
 			++$page;
-		} while ( count( (array) $ids ) === $per_page );
+			$fetched = count( (array) $ids );
+		} while ( $fetched === $per_page );
 
 		if ( ! empty( $config['include_registered'] ) ) {
 			$page = 1;
@@ -183,7 +185,8 @@ class MLP_Source_WooCommerce {
 					}
 				}
 				++$page;
-			} while ( count( $users ) === 500 );
+				$fetched = count( $users );
+			} while ( 500 === $fetched );
 		}
 
 		return true;
@@ -230,7 +233,8 @@ class MLP_Source_WooCommerce {
 					self::emit_order( $order, $emit, 'order:' . $order_id );
 				}
 			}
-		} while ( count( (array) $order_ids ) === $per_page );
+			$fetched = count( (array) $order_ids );
+		} while ( $fetched === $per_page );
 
 		return true;
 	}
@@ -267,7 +271,8 @@ class MLP_Source_WooCommerce {
 					}
 				}
 				$offset += $per_page;
-			} while ( count( $subscriptions ) === $per_page );
+				$fetched = count( $subscriptions );
+			} while ( $fetched === $per_page );
 		}
 
 		return true;

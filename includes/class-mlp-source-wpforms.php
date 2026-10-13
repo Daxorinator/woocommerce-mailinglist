@@ -178,7 +178,8 @@ class MLP_Source_WPForms {
 
 				call_user_func( $emit, $email, $name, 'entry:' . $row->entry_id );
 			}
-		} while ( count( (array) $rows ) === $per_page );
+			$fetched = count( (array) $rows );
+		} while ( $fetched === $per_page );
 
 		return true;
 	}
@@ -186,9 +187,9 @@ class MLP_Source_WPForms {
 	/**
 	 * IDs of every entry of a form that was submitted with the given email address.
 	 *
-	 * @param int   $form_id    Form ID.
+	 * @param int    $form_id    Form ID.
 	 * @param string $email     Normalised email.
-	 * @param int[] $candidates Extra entry IDs to check (covers values LIKE cannot match).
+	 * @param int[]  $candidates Extra entry IDs to check (covers values LIKE cannot match).
 	 * @return int[]
 	 */
 	public static function find_entry_ids( $form_id, $email, $candidates = array() ) {
@@ -258,9 +259,9 @@ class MLP_Source_WPForms {
 	/**
 	 * Delete every entry of a form submitted with the given email address.
 	 *
-	 * @param int   $form_id    Form ID.
+	 * @param int    $form_id    Form ID.
 	 * @param string $email     Normalised email.
-	 * @param int[] $candidates Extra entry IDs known to belong to this address.
+	 * @param int[]  $candidates Extra entry IDs known to belong to this address.
 	 * @return int Number of entries removed.
 	 */
 	public static function delete_entries( $form_id, $email, $candidates = array() ) {

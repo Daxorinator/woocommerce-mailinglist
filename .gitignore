@@ -14,3 +14,7 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+
+# Test tooling
+/.phpunit.cache/
+/.phpunit.result.cache

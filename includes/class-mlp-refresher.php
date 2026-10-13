@@ -44,39 +44,10 @@ class MLP_Refresher {
 		$run     = uniqid( '', true );
 		$now     = mlp_now();
 		$list_id = (int) $list->id;
-		$batch   = array();
+		$buffer  = new MLP_Member_Buffer( $list_id, $run, $now );
 
-		$flush = function () use ( &$batch, $wpdb, $table, $list_id, $run, $now ) {
-			if ( ! $batch ) {
-				return;
-			}
-			$placeholders = array();
-			$values       = array();
-			foreach ( $batch as $member ) {
-				$placeholders[] = '(%d,%s,%s,%s,%s,%s)';
-				array_push( $values, $list_id, $member[0], $member[1], $member[2], $run, $now );
-			}
-			$wpdb->query(
-				$wpdb->prepare(
-					"INSERT INTO {$table} (list_id,email,name,source_ref,seen_run,added_at) VALUES " . implode( ',', $placeholders ) . // phpcs:ignore WordPress.DB.PreparedSQL
-					' ON DUPLICATE KEY UPDATE name = VALUES(name), source_ref = VALUES(source_ref), seen_run = VALUES(seen_run)',
-					$values
-				)
-			);
-			$batch = array();
-		};
-
-		$emit = function ( $email, $name, $ref ) use ( &$batch, $flush ) {
-			$email = mlp_normalize_email( $email );
-			if ( ! $email ) {
-				return;
-			}
-			$name = function_exists( 'mb_substr' ) ? mb_substr( (string) $name, 0, 190 ) : substr( (string) $name, 0, 190 );
-			// Keyed by email so one batch never carries the same address twice.
-			$batch[ $email ] = array( $email, $name, substr( (string) $ref, 0, 190 ) );
-			if ( count( $batch ) >= 200 ) {
-				$flush();
-			}
+		$emit = function ( $email, $name, $ref ) use ( $buffer ) {
+			$buffer->add( $email, $name, $ref );
 		};
 
 		if ( MLP_Lists::TYPE_MARKETING === $list->type ) {
@@ -84,7 +55,7 @@ class MLP_Refresher {
 		} else {
 			$result = MLP_Source_WooCommerce::fetch( $list->config, $emit );
 		}
-		$flush();
+		$buffer->flush();
 
 		if ( is_wp_error( $result ) ) {
 			$wpdb->update( MLP_DB::table( 'lists' ), array( 'last_error' => $result->get_error_message() ), array( 'id' => $list_id ) );

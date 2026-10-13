@@ -145,7 +145,14 @@ class MLP_Campaigns {
 		);
 
 		if ( ! $total ) {
-			$wpdb->update( MLP_DB::table( 'campaigns' ), array( 'status' => 'draft', 'started_at' => null ), array( 'id' => $id ) );
+			$wpdb->update(
+				MLP_DB::table( 'campaigns' ),
+				array(
+					'status'     => 'draft',
+					'started_at' => null,
+				),
+				array( 'id' => $id )
+			);
 			$message = __( 'This mailing list has no recipients, so nothing was sent.', 'mailinglist-plugin' );
 			return new WP_Error( 'mlp_empty_list', $warning ? $message . ' ' . $warning : $message );
 		}
