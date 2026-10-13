@@ -86,6 +86,59 @@ class SourceWooCommerceTest extends MLP_TestCase {
 		$this->assertSame( 'bob@example.com', $this->refresh( $one ) );
 	}
 
+	public function test_purchasers_of_several_products_and_variations() {
+		list( $parent, $variations ) = $this->make_variable_product();
+		$simple                      = $this->make_simple_product();
+		$this->make_order( 'bob@example.com', 'Bob', $variations[0], 'processing' );
+		$this->make_order( 'dave@example.com', 'Dave', $variations[1], 'completed' );
+		$this->make_order( 'alice@example.com', 'Alice', $simple, 'completed' );
+
+		$list = $this->make_product_list(
+			array(
+				'wc_mode'     => 'purchased_product',
+				'product_ids' => array( $variations[0]->get_id(), $simple->get_id() ),
+			)
+		);
+
+		$this->assertSame( 'alice@example.com,bob@example.com', $this->refresh( $list ) );
+	}
+
+	public function test_subscriber_list_mixes_subscriptions_and_normal_products() {
+		$sub    = $this->make_simple_product( 'Subscription' );
+		$normal = $this->make_simple_product( 'T-shirt' );
+		$other  = $this->make_simple_product( 'Other' );
+
+		$alice = $this->make_order( 'alice@example.com', 'Alice', $sub, 'completed' );
+		$this->make_order( 'bob@example.com', 'Bob', $normal, 'completed' );
+		$this->make_order( 'carol@example.com', 'Carol', $other, 'completed' );
+		$dave = $this->make_order( 'dave@example.com', 'Dave', $sub, 'completed' );
+
+		$GLOBALS['mlp_test_subscription_products'] = array( $sub->get_id() );
+		$GLOBALS['mlp_test_subscriptions']         = array(
+			array(
+				'status'       => 'active',
+				'product_id'   => $sub->get_id(),
+				'variation_id' => 0,
+				'order'        => $alice,
+			),
+			array(
+				'status'       => 'cancelled',
+				'product_id'   => $sub->get_id(),
+				'variation_id' => 0,
+				'order'        => $dave,
+			),
+		);
+
+		$list = $this->make_product_list(
+			array(
+				'wc_mode'     => 'active_subscribers',
+				'product_ids' => array( $sub->get_id(), $normal->get_id() ),
+			)
+		);
+
+		$this->assertSame( 'alice@example.com,bob@example.com', $this->refresh( $list ) );
+	}
+
 	public function test_a_purchased_product_list_requires_a_product() {
 		$this->assertWPError( MLP_Lists::save( 0, 'x', 'product', array( 'wc_mode' => 'purchased_product' ) ) );
 	}
@@ -99,7 +152,8 @@ class SourceWooCommerceTest extends MLP_TestCase {
 		$carol = $this->make_order( 'carol@example.com', 'Carol', $variations[1], 'completed' );
 		$alice = $this->make_order( 'alice@example.com', 'Alice', $simple, 'completed' );
 
-		$GLOBALS['mlp_test_subscriptions'] = array(
+		$GLOBALS['mlp_test_subscription_products'] = array( $parent->get_id(), $simple->get_id() );
+		$GLOBALS['mlp_test_subscriptions']         = array(
 			array(
 				'status'       => 'active',
 				'product_id'   => $parent->get_id(),

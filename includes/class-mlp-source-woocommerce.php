@@ -18,8 +18,8 @@ class MLP_Source_WooCommerce {
 	public static function modes() {
 		return array(
 			'all_customers'      => __( 'All customers', 'mailinglist-plugin' ),
-			'purchased_product'  => __( 'All customers who have purchased a product', 'mailinglist-plugin' ),
-			'active_subscribers' => __( 'All subscribers to a subscription product', 'mailinglist-plugin' ),
+			'purchased_product'  => __( 'All customers who have purchased any of the selected products', 'mailinglist-plugin' ),
+			'active_subscribers' => __( 'All subscribers to the selected subscription products (normal products selected are matched by purchasers)', 'mailinglist-plugin' ),
 		);
 	}
 
@@ -72,20 +72,58 @@ class MLP_Source_WooCommerce {
 		return 'product_variation' === get_post_type( $product_id );
 	}
 
+	/**
+	 * Whether a product or variation is a WooCommerce Subscriptions product.
+	 *
+	 * @param int $product_id Product or variation ID.
+	 * @return bool
+	 */
+	private static function is_subscription_product( $product_id ) {
+		if ( class_exists( 'WC_Subscriptions_Product' ) ) {
+			return (bool) WC_Subscriptions_Product::is_subscription( $product_id );
+		}
+		$product = function_exists( 'wc_get_product' ) ? wc_get_product( $product_id ) : null;
+		return $product && $product->is_type( array( 'subscription', 'variable-subscription', 'subscription_variation' ) );
+	}
+
+	/**
+	 * Selected product / variation IDs, accepting the legacy single product_id.
+	 *
+	 * @param array $config Source configuration.
+	 * @return int[]
+	 */
+	public static function product_ids( $config ) {
+		$ids = array();
+		if ( isset( $config['product_ids'] ) ) {
+			$ids = is_array( $config['product_ids'] ) ? $config['product_ids'] : preg_split( '/[\s,]+/', (string) $config['product_ids'] );
+		} elseif ( ! empty( $config['product_id'] ) ) {
+			$ids = array( $config['product_id'] );
+		}
+		return array_values( array_unique( array_filter( array_map( 'absint', $ids ) ) ) );
+	}
+
+	/**
+	 * @param int[] $product_ids Product IDs.
+	 * @return string
+	 */
+	private static function product_names( $product_ids ) {
+		return implode( ', ', array_map( array( __CLASS__, 'product_name' ), $product_ids ) );
+	}
+
 	public static function describe( $config ) {
-		$mode       = isset( $config['wc_mode'] ) ? $config['wc_mode'] : 'all_customers';
-		$product_id = isset( $config['product_id'] ) ? (int) $config['product_id'] : 0;
+		$mode        = isset( $config['wc_mode'] ) ? $config['wc_mode'] : 'all_customers';
+		$product_ids = self::product_ids( $config );
 
 		if ( 'purchased_product' === $mode ) {
-			/* translators: %s: product name */
-			return sprintf( __( 'WooCommerce: customers who purchased %s', 'mailinglist-plugin' ), self::product_name( $product_id ) );
+			/* translators: %s: product name(s) */
+			return sprintf( __( 'WooCommerce: customers who purchased %s', 'mailinglist-plugin' ), self::product_names( $product_ids ) );
 		}
 		if ( 'active_subscribers' === $mode ) {
-			if ( ! $product_id ) {
+			if ( ! $product_ids ) {
 				return __( 'WooCommerce: subscribers to any subscription product', 'mailinglist-plugin' );
 			}
-			/* translators: %s: product name */
-			return sprintf( __( 'WooCommerce: subscribers to %s', 'mailinglist-plugin' ), self::product_name( $product_id ) );
+			/* translators: %s: product name(s) */
+			return sprintf( __( 'WooCommerce: subscribers to / purchasers of %s', 'mailinglist-plugin' ), self::product_names( $product_ids ) );
 		}
 		return __( 'WooCommerce: all customers', 'mailinglist-plugin' );
 	}
@@ -193,19 +231,49 @@ class MLP_Source_WooCommerce {
 	}
 
 	/**
-	 * Customers with an order containing the product. Choosing a variable product
-	 * matches every variation; choosing a variation matches only that variation.
+	 * Customers with an order containing any of the products. Choosing a variable
+	 * product matches every variation; choosing a variation matches only that variation.
 	 */
 	private static function fetch_purchasers( $config, $emit ) {
-		global $wpdb;
-
-		$product_id = isset( $config['product_id'] ) ? (int) $config['product_id'] : 0;
-		if ( ! $product_id ) {
+		$product_ids = self::product_ids( $config );
+		if ( ! $product_ids ) {
 			return new WP_Error( 'mlp_no_product', __( 'No product is selected for this list.', 'mailinglist-plugin' ) );
 		}
 
-		$statuses = self::order_statuses_from( $config );
-		$meta_key = self::is_variation( $product_id ) ? '_variation_id' : '_product_id';
+		self::fetch_purchasers_of( $product_ids, self::order_statuses_from( $config ), $emit );
+		return true;
+	}
+
+	/**
+	 * @param int[]    $product_ids Product / variation IDs.
+	 * @param string[] $statuses    Order statuses.
+	 * @param callable $emit        Emit callback.
+	 */
+	private static function fetch_purchasers_of( $product_ids, $statuses, $emit ) {
+		global $wpdb;
+
+		$parents    = array();
+		$variations = array();
+		foreach ( $product_ids as $product_id ) {
+			if ( self::is_variation( $product_id ) ) {
+				$variations[] = $product_id;
+			} else {
+				$parents[] = $product_id;
+			}
+		}
+
+		// Each line item stores its product and variation under separate meta keys.
+		$clauses = array();
+		$values  = array();
+		if ( $parents ) {
+			$clauses[] = "( oim.meta_key = '_product_id' AND oim.meta_value IN (" . implode( ',', array_fill( 0, count( $parents ), '%s' ) ) . ') )';
+			$values    = array_merge( $values, array_map( 'strval', $parents ) );
+		}
+		if ( $variations ) {
+			$clauses[] = "( oim.meta_key = '_variation_id' AND oim.meta_value IN (" . implode( ',', array_fill( 0, count( $variations ), '%s' ) ) . ') )';
+			$values    = array_merge( $values, array_map( 'strval', $variations ) );
+		}
+
 		$last_id  = 0;
 		$per_page = 500;
 
@@ -216,12 +284,9 @@ class MLP_Source_WooCommerce {
 					"SELECT DISTINCT oi.order_id
 					FROM {$wpdb->prefix}woocommerce_order_items oi
 					INNER JOIN {$wpdb->prefix}woocommerce_order_itemmeta oim ON oi.order_item_id = oim.order_item_id
-					WHERE oi.order_item_type = 'line_item' AND oim.meta_key = %s AND oim.meta_value = %s AND oi.order_id > %d
-					ORDER BY oi.order_id ASC LIMIT %d",
-					$meta_key,
-					(string) $product_id,
-					$last_id,
-					$per_page
+					WHERE oi.order_item_type = 'line_item' AND (" . implode( ' OR ', $clauses ) . ') AND oi.order_id > %d
+					ORDER BY oi.order_id ASC LIMIT %d',
+					array_merge( $values, array( $last_id, $per_page ) )
 				)
 			);
 
@@ -235,8 +300,6 @@ class MLP_Source_WooCommerce {
 			}
 			$fetched = count( (array) $order_ids );
 		} while ( $fetched === $per_page );
-
-		return true;
 	}
 
 	private static function fetch_subscribers( $config, $emit ) {
@@ -244,12 +307,47 @@ class MLP_Source_WooCommerce {
 			return new WP_Error( 'mlp_no_wcs', __( 'WooCommerce Subscriptions is not active.', 'mailinglist-plugin' ) );
 		}
 
-		$product_id = isset( $config['product_id'] ) ? (int) $config['product_id'] : 0;
-		$statuses   = isset( $config['subscription_statuses'] ) && is_array( $config['subscription_statuses'] ) && $config['subscription_statuses']
+		$product_ids = self::product_ids( $config );
+		$statuses    = isset( $config['subscription_statuses'] ) && is_array( $config['subscription_statuses'] ) && $config['subscription_statuses']
 			? $config['subscription_statuses']
 			: array( 'active' );
-		$per_page   = 100;
+		$per_page    = 100;
 
+		// Normal (non-subscription) products in the selection are matched by purchasers.
+		$purchased = array();
+		$targets   = array();
+		foreach ( $product_ids as $product_id ) {
+			if ( self::is_subscription_product( $product_id ) || ! self::product_exists( $product_id ) ) {
+				$targets[] = $product_id;
+			} else {
+				$purchased[] = $product_id;
+			}
+		}
+		if ( $product_ids && ! $targets && ! $purchased ) {
+			return true;
+		}
+		if ( $purchased ) {
+			self::fetch_purchasers_of( $purchased, self::order_statuses_from( $config ), $emit );
+			if ( ! $targets ) {
+				return true;
+			}
+		}
+		if ( ! $product_ids ) {
+			$targets = array( 0 );
+		}
+
+		foreach ( $targets as $product_id ) {
+			self::fetch_subscribers_of( $product_id, $statuses, $per_page, $emit );
+		}
+
+		return true;
+	}
+
+	private static function product_exists( $product_id ) {
+		return function_exists( 'wc_get_product' ) && (bool) wc_get_product( $product_id );
+	}
+
+	private static function fetch_subscribers_of( $product_id, $statuses, $per_page, $emit ) {
 		foreach ( $statuses as $status ) {
 			$offset = 0;
 			do {
@@ -274,7 +372,5 @@ class MLP_Source_WooCommerce {
 				$fetched = count( $subscriptions );
 			} while ( $fetched === $per_page );
 		}
-
-		return true;
 	}
 }

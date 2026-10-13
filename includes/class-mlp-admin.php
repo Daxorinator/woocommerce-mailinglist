@@ -402,20 +402,20 @@ class MLP_Admin {
 						</td>
 					</tr>
 					<tr class="mlp-source-product mlp-wc-row" data-modes="purchased_product active_subscribers">
-						<th scope="row"><label for="mlp_product_id"><?php esc_html_e( 'Product or variation', 'mailinglist-plugin' ); ?></label></th>
+						<th scope="row"><label for="mlp_product_id"><?php esc_html_e( 'Products or variations', 'mailinglist-plugin' ); ?></label></th>
 						<td>
 							<?php if ( wp_script_is( 'wc-enhanced-select', 'registered' ) ) : ?>
-								<select id="mlp_product_id" name="config[product_id]" class="wc-product-search" style="width:400px" data-placeholder="<?php esc_attr_e( 'Search for a product or variation…', 'mailinglist-plugin' ); ?>" data-action="woocommerce_json_search_products_and_variations" data-allow_clear="true">
-									<?php if ( $pr['product_id'] ) : ?>
-										<option value="<?php echo esc_attr( $pr['product_id'] ); ?>" selected><?php echo esc_html( MLP_Source_WooCommerce::product_name( $pr['product_id'] ) ); ?></option>
-									<?php endif; ?>
+								<select id="mlp_product_id" name="config[product_ids][]" class="wc-product-search" multiple="multiple" style="width:400px" data-placeholder="<?php esc_attr_e( 'Search for products or variations…', 'mailinglist-plugin' ); ?>" data-action="woocommerce_json_search_products_and_variations" data-allow_clear="true">
+									<?php foreach ( $pr['product_ids'] as $product_id ) : ?>
+										<option value="<?php echo esc_attr( $product_id ); ?>" selected><?php echo esc_html( MLP_Source_WooCommerce::product_name( $product_id ) ); ?></option>
+									<?php endforeach; ?>
 								</select>
 							<?php else : ?>
-								<input type="number" min="0" id="mlp_product_id" name="config[product_id]" value="<?php echo esc_attr( $pr['product_id'] ); ?>" class="small-text">
-								<span class="description"><?php esc_html_e( 'Product or variation ID', 'mailinglist-plugin' ); ?></span>
+								<input type="text" id="mlp_product_id" name="config[product_ids]" value="<?php echo esc_attr( implode( ',', $pr['product_ids'] ) ); ?>" class="regular-text">
+								<span class="description"><?php esc_html_e( 'Comma-separated product or variation IDs', 'mailinglist-plugin' ); ?></span>
 							<?php endif; ?>
-							<p class="description"><?php esc_html_e( 'Choose a product to include every variation of it, or choose a single variation to target only that variant.', 'mailinglist-plugin' ); ?></p>
-							<p class="description mlp-wc-row" data-modes="active_subscribers"><?php esc_html_e( 'Leave empty to include subscribers to any subscription product.', 'mailinglist-plugin' ); ?></p>
+							<p class="description"><?php esc_html_e( 'Choose one or more products to include every variation of each, or choose single variations to target only those variants. Subscription and normal products can be mixed.', 'mailinglist-plugin' ); ?></p>
+							<p class="description mlp-wc-row" data-modes="active_subscribers"><?php esc_html_e( 'Leave empty to include subscribers to any subscription product. Normal products selected here are matched by customers who purchased them.', 'mailinglist-plugin' ); ?></p>
 						</td>
 					</tr>
 					<tr class="mlp-source-product mlp-wc-row" data-modes="all_customers purchased_product">
