@@ -3,7 +3,7 @@
  * Plugin Name:       Bulk Mailing Lists
  * Description:       Assemble mailing lists from WPForms entries (marketing) or WooCommerce data (product / legal notices) and send bulk emails through wp_mail(), so delivery uses WP Mail SMTP.
  * Version:           1.0.0
- * Requires at least: 5.8
+ * Requires at least: 5.9
  * Requires PHP:      7.4
  * License:           MIT
  * Text Domain:       mailinglist-plugin

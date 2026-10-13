@@ -55,7 +55,7 @@ Product Emails are designed strictly for legal / legitimate interest emails and 
 
 ## Requirements
 
-- WordPress 5.8+, PHP 7.4+
+- WordPress 5.9+, PHP 7.4+
 - WPForms Pro, for Marketing Email lists
 - WooCommerce, for Product Email lists (supports WooCommerce Subscriptions for building subscriber lists)
 - WP Mail SMTP or any other `wp_mail()`-compatible mailer. An SMTP mailer is needed for the `List-Unsubscribe` header to be usable by mail clients
@@ -99,7 +99,7 @@ Connection settings come from `WP_DB_HOST`, `WP_DB_USER`, `WP_DB_PASSWORD`, `WP_
 
 End-to-end tests are separate from the unit tests: `bin/e2e-http.sh` boots a real site and checks the public unsubscribe endpoint over HTTP. CI runs the unit tests in the `unit-tests` job matrix and the end-to-end tests in the `e2e-tests` job matrix.
 
-What CI cannot cover: the fixture models only the `wpforms_entries` columns this plugin reads, so a change to WPForms Pro's schema or entry handler is not caught. Before a release, run the plugin once on a staging site with real WPForms Pro and WooCommerce Subscriptions.
+What CI cannot cover: the fixture models only the `wpforms_entries` columns this plugin reads, so a change to WPForms Pro's schema or entry handler is not caught.
 
 ### Releasing
 

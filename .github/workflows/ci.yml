@@ -59,8 +59,8 @@ jobs:
           - { php: '8.1', wp: 'latest', woocommerce: 'yes' }
           - { php: '8.3', wp: 'latest', woocommerce: 'yes' }
           - { php: '8.4', wp: 'latest', woocommerce: 'yes' }
-          # Oldest WordPress whose test library supports PHPUnit 9. WooCommerce no longer loads on it,
-          # so this cell covers the WPForms-only path.
+          # The plugin's declared minimum WordPress version (also the oldest whose test library supports
+          # PHPUnit 9). WooCommerce no longer loads on it, so this cell covers the WPForms-only path.
           - { php: '7.4', wp: '5.9', woocommerce: 'no', wp_phpunit: '5.9.*' }
           - { php: '8.3', wp: 'nightly', woocommerce: 'yes', experimental: true }
 

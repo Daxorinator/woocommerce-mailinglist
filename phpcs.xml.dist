@@ -49,7 +49,7 @@
 		</properties>
 	</rule>
 
-	<config name="minimum_wp_version" value="5.8"/>
+	<config name="minimum_wp_version" value="5.9"/>
 	<config name="testVersion" value="7.4-"/>
 
 	<rule ref="WordPress.WP.I18n">
