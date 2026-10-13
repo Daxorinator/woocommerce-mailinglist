@@ -11,10 +11,19 @@ class MLP_Updater {
 
 	const REPOSITORY = 'https://github.com/Daxorinator/woocommerce-mailinglist/';
 
+	/** @var object|null */
+	private static $checker = null;
+
 	/**
+	 * Start the update checker once; later calls return the same instance.
+	 *
 	 * @return object|null The update checker, or null when it could not be started.
 	 */
 	public static function init() {
+		if ( self::$checker ) {
+			return self::$checker;
+		}
+
 		$loader = MLP_DIR . 'lib/plugin-update-checker/plugin-update-checker.php';
 		if ( ! is_readable( $loader ) ) {
 			return null;
@@ -35,6 +44,8 @@ class MLP_Updater {
 		if ( $api && method_exists( $api, 'enableReleaseAssets' ) ) {
 			$api->enableReleaseAssets( '/mailinglist-plugin-[\d.]+\.zip$/i' );
 		}
+
+		self::$checker = $checker;
 
 		return $checker;
 	}
