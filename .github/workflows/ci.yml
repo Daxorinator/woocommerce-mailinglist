@@ -47,8 +47,8 @@ jobs:
         if: matrix.php == '8.4'
         run: node --check assets/admin.js
 
-  test:
-    name: PHPUnit (PHP ${{ matrix.php }}, WP ${{ matrix.wp }}${{ matrix.woocommerce == 'no' && ', no WooCommerce' || '' }})
+  unit-tests:
+    name: Unit tests (PHP ${{ matrix.php }}, WP ${{ matrix.wp }}${{ matrix.woocommerce == 'no' && ', no WooCommerce' || '' }})
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.experimental == true }}
     strategy:
@@ -116,9 +116,15 @@ jobs:
             vendor/bin/phpunit
           fi
 
-  e2e-http:
-    name: Unsubscribe endpoint over HTTP
+  e2e-tests:
+    name: End-to-end tests (PHP ${{ matrix.php }}, WP ${{ matrix.wp }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Real site over HTTP: the public unsubscribe endpoint.
+          - { php: '8.3', wp: 'latest' }
 
     services:
       mysql:
@@ -138,9 +144,11 @@ jobs:
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: ${{ matrix.php }}
           extensions: mysqli
           coverage: none
 
-      - name: Run end-to-end checks
+      - name: Run end-to-end tests
+        env:
+          E2E_WP_VERSION: ${{ matrix.wp }}
         run: bin/e2e-http.sh
