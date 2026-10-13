@@ -123,7 +123,7 @@ class MLP_Admin {
 				'confirmSend'   => __( 'Send this email to %1$s recipient(s) on "%2$s"? This cannot be undone.', 'mailinglist-plugin' ),
 				'working'       => __( 'Working…', 'mailinglist-plugin' ),
 				'error'         => __( 'Something went wrong. Please try again.', 'mailinglist-plugin' ),
-				'hintMarketing' => __( 'Sent to a list sourced from WPForms entries. An unsubscribe link is always included; unsubscribing removes the recipient\'s form entry.', 'mailinglist-plugin' ),
+				'hintMarketing' => __( 'Sent to a list sourced from WPForms entries and/or consenting WooCommerce customers. An unsubscribe link is always included and unsubscribing removes the recipient from all marketing emails.', 'mailinglist-plugin' ),
 				'hintProduct'   => __( 'Sent to a list sourced from WooCommerce data, for legal / product notices such as recalls. Recipients cannot unsubscribe.', 'mailinglist-plugin' ),
 			),
 		);
@@ -299,7 +299,8 @@ class MLP_Admin {
 
 		$type = $list ? $list->type : ( ! $has_wpforms && $has_wc ? MLP_Lists::TYPE_PRODUCT : MLP_Lists::TYPE_MARKETING );
 		$mk   = MLP_Lists::sanitize_config( MLP_Lists::TYPE_MARKETING, $list && MLP_Lists::TYPE_MARKETING === $list->type ? $list->config : array() );
-		$pr   = MLP_Lists::sanitize_config( MLP_Lists::TYPE_PRODUCT, $list && MLP_Lists::TYPE_PRODUCT === $list->type ? $list->config : array( 'include_registered' => 1 ) );
+		// The WooCommerce settings are shared: product lists use them, and marketing lists that include customers.
+		$pr   = MLP_Lists::sanitize_config( MLP_Lists::TYPE_PRODUCT, $list ? $list->config : array( 'include_registered' => 1 ) );
 
 		$forms  = $has_wpforms ? MLP_Source_WPForms::get_forms() : array();
 		$fields = $mk['form_id'] ? MLP_Source_WPForms::get_form_fields( $mk['form_id'] ) : array();
@@ -323,7 +324,7 @@ class MLP_Admin {
 								<label>
 									<input type="radio" name="type" value="marketing" <?php checked( $type, 'marketing' ); ?>>
 									<strong><?php esc_html_e( 'Marketing Email', 'mailinglist-plugin' ); ?></strong>
-									— <?php esc_html_e( 'recipients come from WPForms entries. Every email includes an unsubscribe link.', 'mailinglist-plugin' ); ?>
+									— <?php esc_html_e( 'recipients come from WPForms entries and/or WooCommerce customers who agreed to marketing email. Every email includes an unsubscribe link.', 'mailinglist-plugin' ); ?>
 								</label><br>
 								<label>
 									<input type="radio" name="type" value="product" <?php checked( $type, 'product' ); ?>>
@@ -382,13 +383,21 @@ class MLP_Admin {
 						</td>
 					</tr>
 
+					<tr class="mlp-source-marketing">
+						<th scope="row"><?php esc_html_e( 'WooCommerce customers', 'mailinglist-plugin' ); ?></th>
+						<td>
+							<label><input type="checkbox" id="mlp_include_customers" name="config[include_customers]" value="1" <?php checked( $mk['include_customers'] ); ?>> <?php esc_html_e( 'Also include WooCommerce customers', 'mailinglist-plugin' ); ?></label>
+							<p class="description"><?php esc_html_e( 'Only tick this if these customers have agreed to receive marketing email. They are added to the same list as the form entries (an address on both appears once) and can unsubscribe like anyone else; an unsubscribed customer is not added back.', 'mailinglist-plugin' ); ?></p>
+						</td>
+					</tr>
+
 					<?php
-					// Product: WooCommerce.
+					// WooCommerce: the source of product lists, and optionally of marketing lists.
 					?>
 					<?php if ( ! $has_wc ) : ?>
-						<tr class="mlp-source-product"><th></th><td><div class="notice notice-warning inline"><p><?php esc_html_e( 'WooCommerce is not active. Product lists need WooCommerce.', 'mailinglist-plugin' ); ?></p></div></td></tr>
+						<tr class="mlp-source-wc"><th></th><td><div class="notice notice-warning inline"><p><?php esc_html_e( 'WooCommerce is not active. Lists sourced from customers need WooCommerce.', 'mailinglist-plugin' ); ?></p></div></td></tr>
 					<?php endif; ?>
-					<tr class="mlp-source-product">
+					<tr class="mlp-source-wc">
 						<th scope="row"><label for="mlp_wc_mode"><?php esc_html_e( 'Recipients', 'mailinglist-plugin' ); ?></label></th>
 						<td>
 							<select id="mlp_wc_mode" name="config[wc_mode]">
@@ -401,7 +410,7 @@ class MLP_Admin {
 							<?php endif; ?>
 						</td>
 					</tr>
-					<tr class="mlp-source-product mlp-wc-row" data-modes="purchased_product active_subscribers">
+					<tr class="mlp-source-wc mlp-wc-row" data-modes="purchased_product active_subscribers">
 						<th scope="row"><label for="mlp_product_id"><?php esc_html_e( 'Products or variations', 'mailinglist-plugin' ); ?></label></th>
 						<td>
 							<?php if ( wp_script_is( 'wc-enhanced-select', 'registered' ) ) : ?>
@@ -418,7 +427,7 @@ class MLP_Admin {
 							<p class="description mlp-wc-row" data-modes="active_subscribers"><?php esc_html_e( 'Leave empty to include subscribers to any subscription product. Normal products selected here are matched by customers who purchased them.', 'mailinglist-plugin' ); ?></p>
 						</td>
 					</tr>
-					<tr class="mlp-source-product mlp-wc-row" data-modes="all_customers purchased_product">
+					<tr class="mlp-source-wc mlp-wc-row" data-modes="all_customers purchased_product">
 						<th scope="row"><?php esc_html_e( 'Order statuses', 'mailinglist-plugin' ); ?></th>
 						<td>
 							<fieldset>
@@ -429,11 +438,11 @@ class MLP_Admin {
 							<p class="description"><?php esc_html_e( 'Only orders with these statuses count.', 'mailinglist-plugin' ); ?></p>
 						</td>
 					</tr>
-					<tr class="mlp-source-product mlp-wc-row" data-modes="all_customers">
+					<tr class="mlp-source-wc mlp-wc-row" data-modes="all_customers">
 						<th scope="row"><?php esc_html_e( 'Registered customers', 'mailinglist-plugin' ); ?></th>
 						<td><label><input type="checkbox" name="config[include_registered]" value="1" <?php checked( $pr['include_registered'] ); ?>> <?php esc_html_e( 'Also include customer accounts that have not placed an order', 'mailinglist-plugin' ); ?></label></td>
 					</tr>
-					<tr class="mlp-source-product mlp-wc-row" data-modes="active_subscribers">
+					<tr class="mlp-source-wc mlp-wc-row" data-modes="active_subscribers">
 						<th scope="row"><?php esc_html_e( 'Subscription statuses', 'mailinglist-plugin' ); ?></th>
 						<td>
 							<fieldset>
@@ -554,7 +563,7 @@ class MLP_Admin {
 						<th scope="row"><label for="mlp_email_type"><?php esc_html_e( 'Email type', 'mailinglist-plugin' ); ?></label></th>
 						<td>
 							<select id="mlp_email_type" name="email_type">
-								<option value="marketing" <?php selected( $type, 'marketing' ); ?>><?php esc_html_e( 'Marketing Email (WPForms lists)', 'mailinglist-plugin' ); ?></option>
+								<option value="marketing" <?php selected( $type, 'marketing' ); ?>><?php esc_html_e( 'Marketing Email (form and customer lists)', 'mailinglist-plugin' ); ?></option>
 								<option value="product" <?php selected( $type, 'product' ); ?>><?php esc_html_e( 'Product Email (WooCommerce lists)', 'mailinglist-plugin' ); ?></option>
 							</select>
 							<p class="description" id="mlp-type-hint"></p>

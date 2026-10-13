@@ -8,8 +8,8 @@ Every list is one of two types, which decides where its addresses come from and 
 
 | | Marketing Email | Product Email |
 |---|---|---|
-| Source | Entries of a WPForms form | WooCommerce data |
-| Intended for | Newsletters and promotions, where double opt-in consent was collected | Legal / product notices / other GDPR legitimate interest |
+| Source | Entries of a WPForms form, and/or WooCommerce customers | WooCommerce data |
+| Intended for | Newsletters and promotions, to people who have agreed to receive them | Legal / product notices / other GDPR legitimate interest |
 | Unsubscribe | Always included | Not possible |
 
 ## Sources
@@ -19,6 +19,7 @@ Every list is one of two types, which decides where its addresses come from and 
 - Pick a form, and optionally which field holds the email address and the name
 - Every entry's address goes on the list; spam and trashed entries are skipped
 - Requires WPForms Pro, because the free version does not store entries in the site's database
+- A marketing list may use a form, WooCommerce customers, or both. An address that is in both appears once
 
 **WooCommerce**
 
@@ -28,6 +29,8 @@ Choose applicable customers based on:
 - All subscribers to a subscription product or subscription variation (requires WooCommerce Subscriptions); can be left empty for any/all subscription customers
 
 Which order and subscription statuses are applicable can be set per list.
+
+Product lists use these options directly. A **marketing** list uses them when **Also include WooCommerce customers** is ticked, which is how to email form subscribers and customers together. Only tick it when those customers have agreed to marketing email: the plugin includes everyone matching the options.
 
 ## Refreshing
 
@@ -49,15 +52,21 @@ Merge tags: `{name}` `{email}` `{site_name}` `{site_url}` `{unsubscribe_link}` `
 ## Unsubscribing
 
 Marketing Emails always carry a signed unsubscribe link, plus one-click `List-Unsubscribe` headers.
-Unsubscribing deletes the associated entry from the WPForms form the list is sourcing from
+
+Unsubscribing opts the address out of marketing email as a whole, not just the one list:
+- Its entries are deleted from every WPForms form that a marketing list uses
+- It is removed from every marketing list and from any marketing email still waiting to be sent
+- A keyed hash (HMAC-SHA256 with a per-site secret) of the address is stored so a WooCommerce customer is not added back by the next refresh. The address itself is not kept and the hash cannot be turned back into one. Signing up through the form again is a new opt-in and puts the person back on the list
+
+Product lists ignore this record: a legal or product notice still reaches an unsubscribed customer.
 
 Product Emails are designed strictly for legal / legitimate interest emails and thus get no unsubscribe link or header.
 
 ## Requirements
 
 - WordPress 5.9+, PHP 7.4+
-- WPForms Pro, for Marketing Email lists
-- WooCommerce, for Product Email lists (supports WooCommerce Subscriptions for building subscriber lists)
+- WPForms Pro, for Marketing Email lists sourced from a form
+- WooCommerce, for Product Email lists and for marketing lists that include customers (supports WooCommerce Subscriptions for building subscriber lists)
 - WP Mail SMTP or any other `wp_mail()`-compatible mailer. An SMTP mailer is needed for the `List-Unsubscribe` header to be usable by mail clients
 - A working WP-Cron. On low-traffic sites, trigger `wp-cron.php` from a real cron job so the daily refresh and send batches run on time
 

@@ -126,7 +126,7 @@ class UnsubscribeTest extends MLP_TestCase {
 		$this->assertNull( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->prefix . 'mlp_unsubscribes' ) ) );
 
 		// No plugin table or option may contain the address any more.
-		foreach ( array( 'lists', 'members', 'campaigns', 'queue' ) as $table ) {
+		foreach ( array( 'lists', 'members', 'campaigns', 'queue', 'suppressions' ) as $table ) {
 			$rows = $wpdb->get_results( 'SELECT * FROM ' . MLP_DB::table( $table ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 			$this->assertStringNotContainsString( 'ann@example.com', wp_json_encode( $rows ), "$table must not keep the address" );
 		}

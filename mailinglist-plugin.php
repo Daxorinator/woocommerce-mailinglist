@@ -21,6 +21,7 @@ require_once MLP_DIR . 'includes/class-mlp-settings.php';
 require_once MLP_DIR . 'includes/class-mlp-lists.php';
 require_once MLP_DIR . 'includes/class-mlp-source-wpforms.php';
 require_once MLP_DIR . 'includes/class-mlp-source-woocommerce.php';
+require_once MLP_DIR . 'includes/class-mlp-suppressions.php';
 require_once MLP_DIR . 'includes/class-mlp-member-buffer.php';
 require_once MLP_DIR . 'includes/class-mlp-refresher.php';
 require_once MLP_DIR . 'includes/class-mlp-unsubscribe.php';

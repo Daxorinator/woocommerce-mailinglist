@@ -51,7 +51,24 @@ class MLP_Refresher {
 		};
 
 		if ( MLP_Lists::TYPE_MARKETING === $list->type ) {
-			$result = MLP_Source_WPForms::fetch( $list->config, $emit );
+			$result = true;
+
+			if ( MLP_Lists::form_id( $list ) ) {
+				$result = MLP_Source_WPForms::fetch( $list->config, $emit );
+			}
+
+			if ( MLP_Lists::includes_customers( $list ) ) {
+				// Customers who unsubscribed are skipped here. Only this source is filtered: unsubscribing
+				// deletes the person's form entries, so an entry that exists is a fresh opt-in and stays.
+				$suppressed  = MLP_Suppressions::all();
+				$emit_orders = function ( $email, $name, $ref ) use ( $emit, $suppressed ) {
+					if ( ! isset( $suppressed[ MLP_Suppressions::hash( $email ) ] ) ) {
+						call_user_func( $emit, $email, $name, $ref );
+					}
+				};
+				$customers   = MLP_Source_WooCommerce::fetch( $list->config, $emit_orders );
+				$result      = is_wp_error( $result ) ? $result : $customers;
+			}
 		} else {
 			$result = MLP_Source_WooCommerce::fetch( $list->config, $emit );
 		}

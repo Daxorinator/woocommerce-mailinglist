@@ -6,13 +6,13 @@ defined( 'ABSPATH' ) || exit;
  */
 class MLP_DB {
 
-	const VERSION        = '2';
+	const VERSION        = '3';
 	const VERSION_OPTION = 'mlp_db_version';
 
 	/**
 	 * Full table name for one of the plugin's tables.
 	 *
-	 * @param string $name lists|members|campaigns|queue.
+	 * @param string $name lists|members|campaigns|queue|suppressions.
 	 * @return string
 	 */
 	public static function table( $name ) {
@@ -38,6 +38,7 @@ class MLP_DB {
 		$members   = self::table( 'members' );
 		$campaigns = self::table( 'campaigns' );
 		$queue     = self::table( 'queue' );
+		$suppress  = self::table( 'suppressions' );
 
 		dbDelta(
 			"CREATE TABLE {$lists} (
@@ -106,6 +107,16 @@ class MLP_DB {
 			) {$charset};"
 		);
 
+		// Marketing opt-outs for addresses that come from a source we cannot delete from (WooCommerce
+		// orders). Only a keyed hash is stored, so the table cannot be read back into a list of emails.
+		dbDelta(
+			"CREATE TABLE {$suppress} (
+			email_hash char(64) NOT NULL,
+			created_at datetime NOT NULL,
+			PRIMARY KEY  (email_hash)
+			) {$charset};"
+		);
+
 		// Schema 1 kept a log of unsubscribed addresses. That data is no longer recorded, so remove it.
 		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::table( 'unsubscribes' ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
@@ -118,7 +129,7 @@ class MLP_DB {
 
 	public static function uninstall() {
 		global $wpdb;
-		foreach ( array( 'lists', 'members', 'campaigns', 'queue', 'unsubscribes' ) as $name ) {
+		foreach ( array( 'lists', 'members', 'campaigns', 'queue', 'suppressions', 'unsubscribes' ) as $name ) {
 			$wpdb->query( 'DROP TABLE IF EXISTS ' . self::table( $name ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 		}
 		delete_option( self::VERSION_OPTION );

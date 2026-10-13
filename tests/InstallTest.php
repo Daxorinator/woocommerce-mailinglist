@@ -39,6 +39,21 @@ class InstallTest extends MLP_TestCase {
 		$this->assertSame( MLP_DB::VERSION, get_option( MLP_DB::VERSION_OPTION ) );
 	}
 
+	public function test_upgrading_from_schema_two_adds_the_suppression_table_without_dropping_it_on_later_upgrades() {
+		global $wpdb;
+		$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}mlp_suppressions" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		update_option( MLP_DB::VERSION_OPTION, '2' );
+
+		MLP_DB::maybe_upgrade();
+		$this->assertTrue( $this->table_exists( 'mlp_suppressions' ) );
+
+		MLP_Suppressions::add( 'bob@example.com' );
+		update_option( MLP_DB::VERSION_OPTION, '2' );
+		MLP_DB::maybe_upgrade();
+
+		$this->assertCount( 1, MLP_Suppressions::all() );
+	}
+
 	public function test_uninstall_keeps_data_unless_the_admin_opted_in() {
 		MLP_Settings::update( array( 'delete_data' => 0 ) );
 		$version_before = get_option( MLP_DB::VERSION_OPTION );

@@ -5,7 +5,7 @@ defined( 'ABSPATH' ) || exit;
  * Mailing list storage.
  *
  * A list has a type which fixes its source:
- *  - marketing: WPForms entries, recipients can unsubscribe.
+ *  - marketing: WPForms entries and/or WooCommerce customers, recipients can unsubscribe.
  *  - product:   WooCommerce data, legal / product notices, no unsubscribe.
  */
 class MLP_Lists {
@@ -66,13 +66,26 @@ class MLP_Lists {
 	 */
 	public static function sanitize_config( $type, $raw ) {
 		if ( self::TYPE_MARKETING === $type ) {
-			return array(
-				'form_id'     => isset( $raw['form_id'] ) ? absint( $raw['form_id'] ) : 0,
-				'email_field' => isset( $raw['email_field'] ) && '' !== $raw['email_field'] ? (string) absint( $raw['email_field'] ) : '',
-				'name_field'  => isset( $raw['name_field'] ) && '' !== $raw['name_field'] ? (string) absint( $raw['name_field'] ) : '',
+			$config = array(
+				'form_id'           => isset( $raw['form_id'] ) ? absint( $raw['form_id'] ) : 0,
+				'email_field'       => isset( $raw['email_field'] ) && '' !== $raw['email_field'] ? (string) absint( $raw['email_field'] ) : '',
+				'name_field'        => isset( $raw['name_field'] ) && '' !== $raw['name_field'] ? (string) absint( $raw['name_field'] ) : '',
+				'include_customers' => empty( $raw['include_customers'] ) ? 0 : 1,
 			);
+			// WooCommerce customers are an optional second source, configured like a product list's.
+			return $config['include_customers'] ? array_merge( $config, self::sanitize_woocommerce_config( $raw ) ) : $config;
 		}
 
+		return self::sanitize_woocommerce_config( $raw );
+	}
+
+	/**
+	 * The WooCommerce source keys, shared by product lists and by marketing lists that include customers.
+	 *
+	 * @param array $raw Unslashed raw input.
+	 * @return array
+	 */
+	private static function sanitize_woocommerce_config( $raw ) {
 		$modes = array_keys( MLP_Source_WooCommerce::modes() );
 		$mode  = isset( $raw['wc_mode'] ) && in_array( $raw['wc_mode'], $modes, true ) ? $raw['wc_mode'] : 'all_customers';
 
@@ -123,10 +136,10 @@ class MLP_Lists {
 
 		$config = self::sanitize_config( $type, (array) $config );
 
-		if ( self::TYPE_MARKETING === $type && ! $config['form_id'] ) {
-			return new WP_Error( 'mlp_form', __( 'Please choose the WPForms form to source email addresses from.', 'mailinglist-plugin' ) );
+		if ( self::TYPE_MARKETING === $type && ! $config['form_id'] && ! $config['include_customers'] ) {
+			return new WP_Error( 'mlp_form', __( 'Please choose a WPForms form, or include WooCommerce customers, to source email addresses from.', 'mailinglist-plugin' ) );
 		}
-		if ( self::TYPE_PRODUCT === $type && 'purchased_product' === $config['wc_mode'] && ! $config['product_ids'] ) {
+		if ( isset( $config['wc_mode'] ) && 'purchased_product' === $config['wc_mode'] && ! $config['product_ids'] ) {
 			return new WP_Error( 'mlp_product', __( 'Please choose the products whose purchasers should be on this list.', 'mailinglist-plugin' ) );
 		}
 
@@ -174,9 +187,26 @@ class MLP_Lists {
 	 */
 	public static function describe_source( $list ) {
 		if ( self::TYPE_MARKETING === $list->type ) {
-			return MLP_Source_WPForms::describe( $list->config );
+			$parts = array();
+			if ( self::form_id( $list ) ) {
+				$parts[] = MLP_Source_WPForms::describe( $list->config );
+			}
+			if ( self::includes_customers( $list ) ) {
+				$parts[] = MLP_Source_WooCommerce::describe( $list->config );
+			}
+			return implode( ' + ', $parts );
 		}
 		return MLP_Source_WooCommerce::describe( $list->config );
+	}
+
+	/**
+	 * Whether a marketing list also draws its addresses from WooCommerce.
+	 *
+	 * @param object $list List.
+	 * @return bool
+	 */
+	public static function includes_customers( $list ) {
+		return self::TYPE_MARKETING === $list->type && ! empty( $list->config['include_customers'] );
 	}
 
 	public static function count_members( $list_id, $search = '' ) {

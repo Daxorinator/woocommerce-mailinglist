@@ -17,17 +17,20 @@ jQuery( function ( $ ) {
 			var type = $listType.filter( ':checked' ).val();
 			var mode = $( '#mlp_wc_mode' ).val();
 
+			// WooCommerce settings serve product lists, and marketing lists that include customers.
+			var showWc = type === 'product' || ( type === 'marketing' && $( '#mlp_include_customers' ).is( ':checked' ) );
+
 			$( '.mlp-source-marketing' ).toggle( type === 'marketing' );
-			$( '.mlp-source-product' ).toggle( type === 'product' );
+			$( '.mlp-source-wc' ).toggle( showWc );
 
 			$( '.mlp-wc-row' ).each( function () {
 				var modes = String( $( this ).data( 'modes' ) ).split( ' ' );
-				$( this ).toggle( type === 'product' && modes.indexOf( mode ) !== -1 );
+				$( this ).toggle( showWc && modes.indexOf( mode ) !== -1 );
 			} );
 		};
 
 		$listType.on( 'change', toggleMode );
-		$( '#mlp_wc_mode' ).on( 'change', toggleMode );
+		$( '#mlp_wc_mode, #mlp_include_customers' ).on( 'change', toggleMode );
 		toggleMode();
 
 		$( '#mlp_form_id' ).on( 'change', function () {

@@ -4,10 +4,12 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Unsubscribe links for marketing emails.
  *
- * Unsubscribing deletes the recipient's WPForms entries from the form the list
- * is sourced from, which takes them off every list built from that form. No
- * record of who unsubscribed is kept. Product (WooCommerce) lists never get a
- * link and cannot be unsubscribed from.
+ * Unsubscribing opts the address out of marketing email as a whole: its WPForms
+ * entries are deleted from every form a marketing list uses, and a keyed hash
+ * of the address is recorded so WooCommerce customers are not re-added by the
+ * next refresh (see MLP_Suppressions). Nothing else about the person is kept.
+ * Product lists never get a link, cannot be unsubscribed from, and ignore the
+ * suppression record.
  */
 class MLP_Unsubscribe {
 
@@ -43,10 +45,10 @@ class MLP_Unsubscribe {
 	}
 
 	/**
-	 * Unsubscribe an address from a marketing list.
+	 * Opt an address out of marketing email.
 	 *
-	 * @param object $list  List.
-	 * @param string $email Recipient.
+	 * @param object|null $list  The list the link came from, or null when it has since been deleted.
+	 * @param string      $email Recipient.
 	 * @return int|WP_Error Number of WPForms entries removed.
 	 */
 	public static function unsubscribe( $list, $email ) {
@@ -56,43 +58,50 @@ class MLP_Unsubscribe {
 		if ( ! $email ) {
 			return new WP_Error( 'mlp_email', __( 'Invalid email address.', 'mailinglist-plugin' ) );
 		}
-		if ( MLP_Lists::TYPE_MARKETING !== $list->type ) {
+		if ( $list && MLP_Lists::TYPE_MARKETING !== $list->type ) {
 			return new WP_Error( 'mlp_not_marketing', __( 'It is not possible to unsubscribe from this type of email.', 'mailinglist-plugin' ) );
 		}
 
-		$form_id = MLP_Lists::form_id( $list );
+		MLP_Suppressions::add( $email );
+
 		$members = MLP_DB::table( 'members' );
 
-		// Every marketing list sourced from the same form loses this address.
+		// The address leaves every marketing list, and its entries every form those lists use.
 		$list_ids = array();
+		$by_form  = array();
 		foreach ( MLP_Lists::all( MLP_Lists::TYPE_MARKETING ) as $other ) {
-			if ( MLP_Lists::form_id( $other ) === $form_id ) {
-				$list_ids[] = (int) $other->id;
+			$list_ids[] = (int) $other->id;
+			$form_id    = MLP_Lists::form_id( $other );
+			if ( $form_id ) {
+				$by_form[ $form_id ][] = (int) $other->id;
 			}
 		}
-		$in = implode( ',', $list_ids ? $list_ids : array( (int) $list->id ) );
+		$in = implode( ',', $list_ids ? $list_ids : array( 0 ) );
 
-		$candidates = array();
-		foreach ( (array) $wpdb->get_col( $wpdb->prepare( "SELECT source_ref FROM {$members} WHERE email = %s AND list_id IN ({$in})", $email ) ) as $ref ) { // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			if ( 0 === strpos( $ref, 'entry:' ) ) {
-				$candidates[] = (int) substr( $ref, 6 );
+		$removed = 0;
+		foreach ( $by_form as $form_id => $form_list_ids ) {
+			$form_in    = implode( ',', $form_list_ids );
+			$candidates = array();
+			foreach ( (array) $wpdb->get_col( $wpdb->prepare( "SELECT source_ref FROM {$members} WHERE email = %s AND list_id IN ({$form_in})", $email ) ) as $ref ) { // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				if ( 0 === strpos( $ref, 'entry:' ) ) {
+					$candidates[] = (int) substr( $ref, 6 );
+				}
 			}
+			$removed += MLP_Source_WPForms::delete_entries( (int) $form_id, $email, $candidates );
 		}
-
-		$removed = MLP_Source_WPForms::delete_entries( $form_id, $email, $candidates );
 
 		$wpdb->query( $wpdb->prepare( "DELETE FROM {$members} WHERE email = %s AND list_id IN ({$in})", $email ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		foreach ( $list_ids as $list_id ) {
 			$wpdb->update( MLP_DB::table( 'lists' ), array( 'member_count' => MLP_Lists::count_members( $list_id ) ), array( 'id' => $list_id ) );
 		}
 
-		// Drop the address from anything still waiting to be sent to those lists. The rows are
+		// Drop the address from every marketing email still waiting to be sent. The rows are
 		// deleted rather than marked, so the delivery log does not record who unsubscribed.
 		$queue     = MLP_DB::table( 'queue' );
 		$campaigns = MLP_DB::table( 'campaigns' );
 		$wpdb->query(
 			$wpdb->prepare(
-				"DELETE FROM {$queue} WHERE email = %s AND status = 'pending' AND campaign_id IN ( SELECT id FROM {$campaigns} WHERE type = 'marketing' AND list_id IN ({$in}) )", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"DELETE FROM {$queue} WHERE email = %s AND status = 'pending' AND campaign_id IN ( SELECT id FROM {$campaigns} WHERE type = 'marketing' )", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$email
 			)
 		);
@@ -127,12 +136,9 @@ class MLP_Unsubscribe {
 			return;
 		}
 
+		// A deleted list's link still works: the address is opted out of marketing email regardless.
 		$list = MLP_Lists::get( $list_id );
-		if ( ! $list ) {
-			self::render_page( __( 'Unsubscribed', 'mailinglist-plugin' ), __( 'This mailing list no longer exists. You will not receive any further emails from it.', 'mailinglist-plugin' ) );
-			return;
-		}
-		if ( MLP_Lists::TYPE_MARKETING !== $list->type ) {
+		if ( $list && MLP_Lists::TYPE_MARKETING !== $list->type ) {
 			self::render_page( __( 'Cannot unsubscribe', 'mailinglist-plugin' ), __( 'It is not possible to unsubscribe from this type of email.', 'mailinglist-plugin' ), 400 );
 			return;
 		}
