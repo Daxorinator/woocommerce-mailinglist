@@ -99,8 +99,6 @@ Connection settings come from `WP_DB_HOST`, `WP_DB_USER`, `WP_DB_PASSWORD`, `WP_
 
 End-to-end tests are separate from the unit tests: `bin/e2e-http.sh` boots a real site and checks the public unsubscribe endpoint over HTTP. CI runs the unit tests in the `unit-tests` job matrix and the end-to-end tests in the `e2e-tests` job matrix.
 
-What CI cannot cover: the fixture models only the `wpforms_entries` columns this plugin reads, so a change to WPForms Pro's schema or entry handler is not caught.
-
 ### Releasing
 
 1. Bump `Version:` and `MLP_VERSION` in `mailinglist-plugin.php` (they must match).
