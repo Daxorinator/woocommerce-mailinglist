@@ -5,9 +5,9 @@ defined( 'ABSPATH' ) || exit;
  * Unsubscribe links for marketing emails.
  *
  * Unsubscribing deletes the recipient's WPForms entries from the form the list
- * is sourced from, and logs the address so it stays off every list built from
- * that form even if an entry could not be removed. Product (WooCommerce) lists
- * never get a link and cannot be unsubscribed from.
+ * is sourced from, which takes them off every list built from that form. No
+ * record of who unsubscribed is kept. Product (WooCommerce) lists never get a
+ * link and cannot be unsubscribed from.
  */
 class MLP_Unsubscribe {
 
@@ -39,38 +39,6 @@ class MLP_Unsubscribe {
 				't'               => self::token( $list_id, $email ),
 			),
 			home_url( '/' )
-		);
-	}
-
-	/**
-	 * Unsubscribed addresses for a form.
-	 *
-	 * @param int $form_id Form ID.
-	 * @return array email => UTC datetime of the unsubscribe.
-	 */
-	public static function get_suppressed( $form_id ) {
-		global $wpdb;
-		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT email, created_at FROM ' . MLP_DB::table( 'unsubscribes' ) . ' WHERE form_id = %d', $form_id ) );
-		$map  = array();
-		foreach ( (array) $rows as $row ) {
-			$map[ $row->email ] = $row->created_at;
-		}
-		return $map;
-	}
-
-	public static function is_suppressed( $form_id, $email ) {
-		global $wpdb;
-		return (bool) $wpdb->get_var( $wpdb->prepare( 'SELECT id FROM ' . MLP_DB::table( 'unsubscribes' ) . ' WHERE form_id = %d AND email = %s', $form_id, $email ) );
-	}
-
-	public static function remove_suppression( $form_id, $email ) {
-		global $wpdb;
-		$wpdb->delete(
-			MLP_DB::table( 'unsubscribes' ),
-			array(
-				'form_id' => $form_id,
-				'email'   => $email,
-			)
 		);
 	}
 
@@ -113,30 +81,18 @@ class MLP_Unsubscribe {
 
 		$removed = MLP_Source_WPForms::delete_entries( $form_id, $email, $candidates );
 
-		// Logged after the entries are deleted: a later form submission is newer than this and re-subscribes.
-		self::remove_suppression( $form_id, $email );
-		$wpdb->insert(
-			MLP_DB::table( 'unsubscribes' ),
-			array(
-				'email'           => $email,
-				'form_id'         => $form_id,
-				'list_id'         => (int) $list->id,
-				'entries_removed' => $removed,
-				'created_at'      => mlp_now(),
-			)
-		);
-
 		$wpdb->query( $wpdb->prepare( "DELETE FROM {$members} WHERE email = %s AND list_id IN ({$in})", $email ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		foreach ( $list_ids as $list_id ) {
 			$wpdb->update( MLP_DB::table( 'lists' ), array( 'member_count' => MLP_Lists::count_members( $list_id ) ), array( 'id' => $list_id ) );
 		}
 
-		// Drop the address from anything still waiting to be sent to those lists.
+		// Drop the address from anything still waiting to be sent to those lists. The rows are
+		// deleted rather than marked, so the delivery log does not record who unsubscribed.
 		$queue     = MLP_DB::table( 'queue' );
 		$campaigns = MLP_DB::table( 'campaigns' );
 		$wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$queue} SET status = 'unsubscribed' WHERE email = %s AND status = 'pending' AND campaign_id IN ( SELECT id FROM {$campaigns} WHERE type = 'marketing' AND list_id IN ({$in}) )", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"DELETE FROM {$queue} WHERE email = %s AND status = 'pending' AND campaign_id IN ( SELECT id FROM {$campaigns} WHERE type = 'marketing' AND list_id IN ({$in}) )", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$email
 			)
 		);

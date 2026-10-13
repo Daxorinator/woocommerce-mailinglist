@@ -6,13 +6,13 @@ defined( 'ABSPATH' ) || exit;
  */
 class MLP_DB {
 
-	const VERSION        = '1';
+	const VERSION        = '2';
 	const VERSION_OPTION = 'mlp_db_version';
 
 	/**
 	 * Full table name for one of the plugin's tables.
 	 *
-	 * @param string $name lists|members|campaigns|queue|unsubscribes.
+	 * @param string $name lists|members|campaigns|queue.
 	 * @return string
 	 */
 	public static function table( $name ) {
@@ -34,11 +34,10 @@ class MLP_DB {
 		$charset = $wpdb->get_charset_collate();
 
 		// Emails are capped at 180 chars so the composite unique keys fit in 767-byte index limits.
-		$lists        = self::table( 'lists' );
-		$members      = self::table( 'members' );
-		$campaigns    = self::table( 'campaigns' );
-		$queue        = self::table( 'queue' );
-		$unsubscribes = self::table( 'unsubscribes' );
+		$lists     = self::table( 'lists' );
+		$members   = self::table( 'members' );
+		$campaigns = self::table( 'campaigns' );
+		$queue     = self::table( 'queue' );
 
 		dbDelta(
 			"CREATE TABLE {$lists} (
@@ -107,18 +106,8 @@ class MLP_DB {
 			) {$charset};"
 		);
 
-		dbDelta(
-			"CREATE TABLE {$unsubscribes} (
-			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-			email varchar(180) NOT NULL,
-			form_id bigint(20) unsigned NOT NULL DEFAULT 0,
-			list_id bigint(20) unsigned NOT NULL DEFAULT 0,
-			entries_removed int(10) unsigned NOT NULL DEFAULT 0,
-			created_at datetime NOT NULL,
-			PRIMARY KEY  (id),
-			UNIQUE KEY form_email (form_id,email)
-			) {$charset};"
-		);
+		// Schema 1 kept a log of unsubscribed addresses. That data is no longer recorded, so remove it.
+		$wpdb->query( 'DROP TABLE IF EXISTS ' . self::table( 'unsubscribes' ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 
 		if ( ! get_option( 'mlp_secret' ) ) {
 			add_option( 'mlp_secret', wp_generate_password( 64, false ), '', 'no' );

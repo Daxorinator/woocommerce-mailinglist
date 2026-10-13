@@ -125,9 +125,6 @@ class MLP_Source_WPForms {
 	/**
 	 * Emit every address found in the form's entries.
 	 *
-	 * Addresses that unsubscribed are skipped, unless they submitted the form
-	 * again afterwards, which counts as a fresh opt-in.
-	 *
 	 * @param array    $config Source configuration.
 	 * @param callable $emit   function( $email, $name, $source_ref ).
 	 * @return true|WP_Error
@@ -149,7 +146,6 @@ class MLP_Source_WPForms {
 
 		$email_field = isset( $config['email_field'] ) ? (string) $config['email_field'] : '';
 		$name_field  = isset( $config['name_field'] ) ? (string) $config['name_field'] : '';
-		$suppressed  = MLP_Unsubscribe::get_suppressed( $form_id );
 		$table       = self::entries_table();
 		$last_id     = 0;
 		$per_page    = 500;
@@ -178,15 +174,6 @@ class MLP_Source_WPForms {
 				list( $email, $name ) = self::extract( $fields, $email_field, $name_field );
 				if ( ! $email ) {
 					continue;
-				}
-
-				if ( isset( $suppressed[ $email ] ) ) {
-					// WPForms stores entry dates in UTC, as does the unsubscribe log.
-					if ( strtotime( $row->date . ' UTC' ) <= strtotime( $suppressed[ $email ] . ' UTC' ) ) {
-						continue;
-					}
-					MLP_Unsubscribe::remove_suppression( $form_id, $email );
-					unset( $suppressed[ $email ] );
 				}
 
 				call_user_func( $emit, $email, $name, 'entry:' . $row->entry_id );

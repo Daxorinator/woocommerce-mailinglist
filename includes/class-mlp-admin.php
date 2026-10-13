@@ -11,7 +11,7 @@ class MLP_Admin {
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'assets' ), 20 );
 		add_action( 'admin_notices', array( __CLASS__, 'render_notice' ) );
 
-		foreach ( array( 'save_list', 'delete_list', 'refresh_list', 'save_campaign', 'campaign_action', 'delete_unsubscribe', 'save_settings' ) as $action ) {
+		foreach ( array( 'save_list', 'delete_list', 'refresh_list', 'save_campaign', 'campaign_action', 'save_settings' ) as $action ) {
 			add_action( 'admin_post_mlp_' . $action, array( __CLASS__, 'handle_' . $action ) );
 		}
 		foreach ( array( 'form_fields', 'preview', 'send_test' ) as $action ) {
@@ -109,7 +109,6 @@ class MLP_Admin {
 		add_submenu_page( 'mlp-lists', __( 'Add Mailing List', 'mailinglist-plugin' ), __( 'Add List', 'mailinglist-plugin' ), $cap, 'mlp-list-edit', array( __CLASS__, 'page_list_edit' ) );
 		add_submenu_page( 'mlp-lists', __( 'Send Email', 'mailinglist-plugin' ), __( 'Send Email', 'mailinglist-plugin' ), $cap, 'mlp-compose', array( __CLASS__, 'page_compose' ) );
 		add_submenu_page( 'mlp-lists', __( 'Emails', 'mailinglist-plugin' ), __( 'Emails', 'mailinglist-plugin' ), $cap, 'mlp-campaigns', array( __CLASS__, 'page_campaigns' ) );
-		add_submenu_page( 'mlp-lists', __( 'Unsubscribes', 'mailinglist-plugin' ), __( 'Unsubscribes', 'mailinglist-plugin' ), $cap, 'mlp-unsubscribes', array( __CLASS__, 'page_unsubscribes' ) );
 		add_submenu_page( 'mlp-lists', __( 'Mailing List Settings', 'mailinglist-plugin' ), __( 'Settings', 'mailinglist-plugin' ), $cap, 'mlp-settings', array( __CLASS__, 'page_settings' ) );
 	}
 
@@ -857,7 +856,6 @@ class MLP_Admin {
 			'pending'      => __( 'Waiting', 'mailinglist-plugin' ),
 			'sending'      => __( 'In progress', 'mailinglist-plugin' ),
 			'failed'       => __( 'Failed', 'mailinglist-plugin' ),
-			'unsubscribed' => __( 'Skipped (unsubscribed)', 'mailinglist-plugin' ),
 			'cancelled'    => __( 'Cancelled', 'mailinglist-plugin' ),
 		);
 
@@ -941,57 +939,6 @@ class MLP_Admin {
 	}
 
 	/* ---------------------------------------------------------------------
-	 * Unsubscribes
-	 * ------------------------------------------------------------------- */
-
-	public static function page_unsubscribes() {
-		global $wpdb;
-		$rows = (array) $wpdb->get_results( 'SELECT * FROM ' . MLP_DB::table( 'unsubscribes' ) . ' ORDER BY id DESC LIMIT 500' ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
-		?>
-		<div class="wrap">
-			<h1><?php esc_html_e( 'Unsubscribes', 'mailinglist-plugin' ); ?></h1>
-			<p class="description"><?php esc_html_e( 'People who used the unsubscribe link in a Marketing Email. Their WPForms entries were deleted, and they are kept off every list sourced from that form unless they submit the form again. Product Emails have no unsubscribe link.', 'mailinglist-plugin' ); ?></p>
-			<table class="wp-list-table widefat fixed striped">
-				<thead>
-					<tr>
-						<th><?php esc_html_e( 'Email', 'mailinglist-plugin' ); ?></th>
-						<th><?php esc_html_e( 'Form', 'mailinglist-plugin' ); ?></th>
-						<th style="width:140px"><?php esc_html_e( 'Entries removed', 'mailinglist-plugin' ); ?></th>
-						<th style="width:190px"><?php esc_html_e( 'Date', 'mailinglist-plugin' ); ?></th>
-					</tr>
-				</thead>
-				<tbody>
-				<?php if ( ! $rows ) : ?>
-					<tr><td colspan="4"><?php esc_html_e( 'Nobody has unsubscribed.', 'mailinglist-plugin' ); ?></td></tr>
-				<?php endif; ?>
-				<?php foreach ( $rows as $row ) : ?>
-					<tr>
-						<td>
-							<?php echo esc_html( $row->email ); ?>
-							<div class="row-actions">
-								<span class="delete"><a href="<?php echo esc_url( self::action_url( 'delete_unsubscribe', array( 'id' => $row->id ) ) ); ?>" class="mlp-confirm" data-confirm="<?php esc_attr_e( 'Remove this record? If an entry for this address still exists in the form, it will be added back to the list at the next refresh.', 'mailinglist-plugin' ); ?>"><?php esc_html_e( 'Remove record', 'mailinglist-plugin' ); ?></a></span>
-							</div>
-						</td>
-						<td><?php echo esc_html( MLP_Source_WPForms::describe( array( 'form_id' => $row->form_id ) ) ); ?></td>
-						<td><?php echo esc_html( number_format_i18n( $row->entries_removed ) ); ?></td>
-						<td><?php echo esc_html( mlp_format_date( $row->created_at ) ); ?></td>
-					</tr>
-				<?php endforeach; ?>
-				</tbody>
-			</table>
-		</div>
-		<?php
-	}
-
-	public static function handle_delete_unsubscribe() {
-		global $wpdb;
-		self::guard( 'mlp_delete_unsubscribe' );
-		$wpdb->delete( MLP_DB::table( 'unsubscribes' ), array( 'id' => isset( $_GET['id'] ) ? absint( $_GET['id'] ) : 0 ) );
-		self::notice( __( 'Unsubscribe record removed.', 'mailinglist-plugin' ) );
-		self::redirect( self::url( 'mlp-unsubscribes' ) );
-	}
-
-	/* ---------------------------------------------------------------------
 	 * Settings
 	 * ------------------------------------------------------------------- */
 
@@ -1047,7 +994,7 @@ class MLP_Admin {
 				<table class="form-table" role="presentation">
 					<tr>
 						<th scope="row"><?php esc_html_e( 'Uninstall', 'mailinglist-plugin' ); ?></th>
-						<td><label><input type="checkbox" name="settings[delete_data]" value="1" <?php checked( $s['delete_data'] ); ?>> <?php esc_html_e( 'Delete all lists, emails and unsubscribe records when the plugin is deleted', 'mailinglist-plugin' ); ?></label></td>
+						<td><label><input type="checkbox" name="settings[delete_data]" value="1" <?php checked( $s['delete_data'] ); ?>> <?php esc_html_e( 'Delete all lists and emails when the plugin is deleted', 'mailinglist-plugin' ); ?></label></td>
 					</tr>
 				</table>
 

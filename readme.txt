@@ -35,7 +35,7 @@ Merge tags: {name} {email} {site_name} {site_url} {unsubscribe_link} {unsubscrib
 
 = Unsubscribing =
 
-Marketing Emails include a signed unsubscribe link (and List-Unsubscribe one-click headers). Unsubscribing deletes that person's entries from the WPForms form the list is sourced from, and records the address so it stays off lists built from that form. Submitting the form again later re-subscribes them.
+Marketing Emails include a signed unsubscribe link (and List-Unsubscribe one-click headers). Unsubscribing deletes that person's entries from the WPForms form the list is sourced from, which takes them off every list built from that form. No record of who unsubscribed is kept. A list is simply everyone who currently has an entry in the form, so submitting the form again later puts them back on it.
 
 == Requirements for background tasks ==
 

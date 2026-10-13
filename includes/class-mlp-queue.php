@@ -164,12 +164,6 @@ class MLP_Queue {
 			}
 			$list = $list_cache[ $list_id ];
 
-			// Honour unsubscribes made after the campaign was queued.
-			if ( MLP_Lists::TYPE_MARKETING === $campaign->type && $list && MLP_Unsubscribe::is_suppressed( MLP_Lists::form_id( $list ), $row->email ) ) {
-				self::finish_row( $row->id, 'unsubscribed' );
-				continue;
-			}
-
 			$result = MLP_Mailer::send( $campaign, $list, $row->email, $row->name );
 
 			if ( is_wp_error( $result ) ) {
