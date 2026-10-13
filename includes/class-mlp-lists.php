@@ -94,7 +94,7 @@ class MLP_Lists {
 
 		return array(
 			'wc_mode'               => $mode,
-			'product_id'            => isset( $raw['product_id'] ) ? absint( $raw['product_id'] ) : 0,
+			'product_ids'           => MLP_Source_WooCommerce::product_ids( $raw ),
 			'order_statuses'        => $order_statuses,
 			'subscription_statuses' => $sub_statuses,
 			'include_registered'    => empty( $raw['include_registered'] ) ? 0 : 1,
@@ -126,8 +126,8 @@ class MLP_Lists {
 		if ( self::TYPE_MARKETING === $type && ! $config['form_id'] ) {
 			return new WP_Error( 'mlp_form', __( 'Please choose the WPForms form to source email addresses from.', 'mailinglist-plugin' ) );
 		}
-		if ( self::TYPE_PRODUCT === $type && 'purchased_product' === $config['wc_mode'] && ! $config['product_id'] ) {
-			return new WP_Error( 'mlp_product', __( 'Please choose the product whose purchasers should be on this list.', 'mailinglist-plugin' ) );
+		if ( self::TYPE_PRODUCT === $type && 'purchased_product' === $config['wc_mode'] && ! $config['product_ids'] ) {
+			return new WP_Error( 'mlp_product', __( 'Please choose the products whose purchasers should be on this list.', 'mailinglist-plugin' ) );
 		}
 
 		$data = array(

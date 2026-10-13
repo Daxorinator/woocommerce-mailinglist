@@ -6,6 +6,24 @@
  * array( 'status' => 'active', 'product_id' => 1, 'variation_id' => 0, 'order' => WC_Order ).
  */
 
+if ( ! class_exists( 'WC_Subscriptions_Product' ) ) {
+	/**
+	 * Subscription products are the IDs listed in $GLOBALS['mlp_test_subscription_products'].
+	 */
+	class WC_Subscriptions_Product {
+
+		public static function is_subscription( $product ) {
+			$id  = is_object( $product ) ? $product->get_id() : (int) $product;
+			$ids = isset( $GLOBALS['mlp_test_subscription_products'] ) ? $GLOBALS['mlp_test_subscription_products'] : array();
+			if ( in_array( $id, $ids, true ) ) {
+				return true;
+			}
+			$parent = (int) wp_get_post_parent_id( $id );
+			return $parent && in_array( $parent, $ids, true );
+		}
+	}
+}
+
 if ( ! class_exists( 'MLP_Stub_Subscription' ) ) {
 	/**
 	 * A subscription that reads its contact details from a plain order.
