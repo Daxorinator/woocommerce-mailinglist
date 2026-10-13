@@ -303,17 +303,13 @@ class MLP_Source_WooCommerce {
 	}
 
 	private static function fetch_subscribers( $config, $emit ) {
-		if ( ! self::subscriptions_available() ) {
-			return new WP_Error( 'mlp_no_wcs', __( 'WooCommerce Subscriptions is not active.', 'mailinglist-plugin' ) );
-		}
-
 		$product_ids = self::product_ids( $config );
 		$statuses    = isset( $config['subscription_statuses'] ) && is_array( $config['subscription_statuses'] ) && $config['subscription_statuses']
 			? $config['subscription_statuses']
 			: array( 'active' );
-		$per_page    = 100;
 
-		// Normal (non-subscription) products in the selection are matched by purchasers.
+		// Normal (non-subscription) products are matched by purchasers and need no
+		// WooCommerce Subscriptions. Everything else is looked up via subscriptions.
 		$purchased = array();
 		$targets   = array();
 		foreach ( $product_ids as $product_id ) {
@@ -323,21 +319,21 @@ class MLP_Source_WooCommerce {
 				$purchased[] = $product_id;
 			}
 		}
-		if ( $product_ids && ! $targets && ! $purchased ) {
-			return true;
-		}
-		if ( $purchased ) {
-			self::fetch_purchasers_of( $purchased, self::order_statuses_from( $config ), $emit );
-			if ( ! $targets ) {
-				return true;
-			}
-		}
 		if ( ! $product_ids ) {
-			$targets = array( 0 );
+			$targets = array( 0 ); // Any subscription product.
 		}
 
-		foreach ( $targets as $product_id ) {
-			self::fetch_subscribers_of( $product_id, $statuses, $per_page, $emit );
+		if ( $purchased ) {
+			self::fetch_purchasers_of( $purchased, self::order_statuses_from( $config ), $emit );
+		}
+
+		if ( $targets ) {
+			if ( ! self::subscriptions_available() ) {
+				return new WP_Error( 'mlp_no_wcs', __( 'WooCommerce Subscriptions is not active.', 'mailinglist-plugin' ) );
+			}
+			foreach ( $targets as $product_id ) {
+				self::fetch_subscribers_of( $product_id, $statuses, 100, $emit );
+			}
 		}
 
 		return true;
