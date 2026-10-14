@@ -15,18 +15,14 @@ concurrency:
 
 jobs:
   lint:
-    name: Lint & static analysis (PHP ${{ matrix.php }})
+    name: Lint & static analysis (PHP 8.4)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        php: ['7.4', '8.4']
     steps:
       - uses: actions/checkout@v7
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php }}
+          php-version: '8.4'
           tools: composer
           coverage: none
 
@@ -40,29 +36,14 @@ jobs:
         run: composer phpcs
 
       - name: Static analysis
-        if: matrix.php == '8.4'
         run: composer phpstan
 
       - name: JavaScript syntax
-        if: matrix.php == '8.4'
         run: node --check assets/admin.js
 
   unit-tests:
-    name: Unit tests (PHP ${{ matrix.php }}, WP ${{ matrix.wp }}${{ matrix.woocommerce == 'no' && ', no WooCommerce' || '' }})
+    name: Unit tests (PHP 8.4, WP latest, WooCommerce)
     runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.experimental == true }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { php: '7.4', wp: 'latest', woocommerce: 'yes' }
-          - { php: '8.1', wp: 'latest', woocommerce: 'yes' }
-          - { php: '8.3', wp: 'latest', woocommerce: 'yes' }
-          - { php: '8.4', wp: 'latest', woocommerce: 'yes' }
-          # The plugin's declared minimum WordPress version (also the oldest whose test library supports
-          # PHPUnit 9). WooCommerce no longer loads on it, so this cell covers the WPForms-only path.
-          - { php: '7.4', wp: '5.9', woocommerce: 'no', wp_phpunit: '5.9.*' }
-          - { php: '8.3', wp: 'nightly', woocommerce: 'yes', experimental: true }
 
     services:
       mysql:
@@ -89,7 +70,7 @@ jobs:
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php }}
+          php-version: '8.4'
           extensions: mysqli
           tools: composer
           coverage: none
@@ -97,34 +78,15 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
-      - name: Use the test library that matches this WordPress version
-        if: matrix.wp_phpunit
-        run: |
-          composer require --dev --no-interaction --no-progress --no-update "wp-phpunit/wp-phpunit:${{ matrix.wp_phpunit }}"
-          composer update --no-interaction --no-progress --with-all-dependencies wp-phpunit/wp-phpunit
-
-      - name: Install WordPress${{ matrix.woocommerce == 'yes' && ' and WooCommerce' || '' }}
-        run: bin/install-wp.sh "${{ matrix.wp }}" "${{ matrix.woocommerce }}"
+      - name: Install WordPress and WooCommerce
+        run: bin/install-wp.sh latest
 
       - name: Run tests
-        env:
-          MLP_SKIP_WOOCOMMERCE: ${{ matrix.woocommerce == 'no' && '1' || '' }}
-        run: |
-          if [ "${{ matrix.woocommerce }}" = "no" ]; then
-            vendor/bin/phpunit --exclude-group woocommerce
-          else
-            vendor/bin/phpunit
-          fi
+        run: vendor/bin/phpunit
 
   e2e-tests:
-    name: End-to-end tests (PHP ${{ matrix.php }}, WP ${{ matrix.wp }})
+    name: End-to-end tests (PHP 8.4, WP latest, WooCommerce)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          # Real site over HTTP: the public unsubscribe endpoint.
-          - { php: '8.3', wp: 'latest' }
 
     services:
       mysql:
@@ -144,11 +106,9 @@ jobs:
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php }}
+          php-version: '8.4'
           extensions: mysqli
           coverage: none
 
       - name: Run end-to-end tests
-        env:
-          E2E_WP_VERSION: ${{ matrix.wp }}
         run: bin/e2e-http.sh

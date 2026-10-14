@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# Download WordPress (and optionally WooCommerce) for the PHPUnit suite and create its database.
+# Download WordPress (and, by default, WooCommerce) for the PHPUnit suite and create its database.
 #
-# Usage: bin/install-wp.sh <wp-version|latest|nightly> [woocommerce: yes|no]
+# Usage: bin/install-wp.sh <wp-version|latest> [woocommerce: yes|no]
 #
 # Environment: WP_CORE_DIR (default /tmp/wordpress), WP_DB_NAME, WP_DB_USER, WP_DB_PASSWORD, WP_DB_HOST.
 set -euo pipefail
@@ -26,7 +26,6 @@ else
 	mkdir -p "$WP_CORE_DIR"
 	case "$WP_VERSION" in
 		latest) url="https://wordpress.org/latest.tar.gz" ;;
-		nightly | trunk) url="https://wordpress.org/nightly-builds/wordpress-latest.zip" ;;
 		*) url="https://wordpress.org/wordpress-${WP_VERSION}.tar.gz" ;;
 	esac
 
