@@ -15,6 +15,8 @@ class MLP_Settings {
 			'from_name'      => '',
 			'from_email'     => '',
 			'reply_to'       => '',
+			'company_name'   => '',
+			'address'        => '',
 			'footer'         => __( 'You are receiving this email because you signed up at {site_name}. {unsubscribe_link}', 'mailinglist-plugin' ),
 			'delete_data'    => 0,
 		);
@@ -44,6 +46,8 @@ class MLP_Settings {
 			'from_name'      => isset( $input['from_name'] ) ? sanitize_text_field( $input['from_name'] ) : '',
 			'from_email'     => isset( $input['from_email'] ) ? sanitize_email( $input['from_email'] ) : '',
 			'reply_to'       => isset( $input['reply_to'] ) ? sanitize_email( $input['reply_to'] ) : '',
+			'company_name'   => isset( $input['company_name'] ) ? sanitize_text_field( $input['company_name'] ) : '',
+			'address'        => isset( $input['address'] ) ? sanitize_textarea_field( $input['address'] ) : '',
 			'footer'         => isset( $input['footer'] ) ? wp_kses_post( $input['footer'] ) : '',
 			'delete_data'    => empty( $input['delete_data'] ) ? 0 : 1,
 		);
