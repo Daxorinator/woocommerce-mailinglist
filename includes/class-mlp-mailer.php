@@ -178,19 +178,27 @@ class MLP_Mailer {
 			get_option( 'woocommerce_store_address' ),
 			get_option( 'woocommerce_store_address_2' ),
 			get_option( 'woocommerce_store_city' ),
-			get_option( 'woocommerce_store_postcode' ),
 		);
 
-		$country = (string) get_option( 'woocommerce_default_country' );
-		if ( '' !== $country ) {
-			$code = explode( ':', $country );
-			if ( function_exists( 'WC' ) && WC()->countries ) {
-				$countries = WC()->countries->get_countries();
-				$parts[]   = isset( $countries[ $code[0] ] ) ? $countries[ $code[0] ] : $code[0];
-			} else {
-				$parts[] = $code[0];
+		// Stored as "CC" or "CC:STATE", e.g. "IE:GA" for Ireland - Galway.
+		$location = explode( ':', (string) get_option( 'woocommerce_default_country' ) );
+		$country  = $location[0];
+		$state    = isset( $location[1] ) ? $location[1] : '';
+
+		if ( '' !== $country && function_exists( 'WC' ) && WC()->countries ) {
+			$states    = WC()->countries->get_states( $country );
+			$countries = WC()->countries->get_countries();
+			if ( '' !== $state && is_array( $states ) && isset( $states[ $state ] ) ) {
+				$state = $states[ $state ];
+			}
+			if ( isset( $countries[ $country ] ) ) {
+				$country = $countries[ $country ];
 			}
 		}
+
+		$parts[] = $state;
+		$parts[] = $country;
+		$parts[] = get_option( 'woocommerce_store_postcode' );
 
 		$parts = array_filter( array_map( 'trim', array_map( 'strval', $parts ) ) );
 		return implode( ', ', $parts );
