@@ -95,9 +95,9 @@ bin/install-wp.sh latest yes     # WordPress + WooCommerce into /tmp/wordpress, 
 vendor/bin/phpunit
 ```
 
-Connection settings come from `WP_DB_HOST`, `WP_DB_USER`, `WP_DB_PASSWORD`, `WP_DB_NAME` (defaults: `127.0.0.1`, `root`, empty, `wordpress_test`) and the WordPress location from `WP_CORE_DIR`. Set `MLP_SKIP_WOOCOMMERCE=1` and pass `--exclude-group woocommerce` to run without WooCommerce.
+Connection settings come from `WP_DB_HOST`, `WP_DB_USER`, `WP_DB_PASSWORD`, `WP_DB_NAME` (defaults: `127.0.0.1`, `root`, empty, `wordpress_test`) and the WordPress location from `WP_CORE_DIR`.
 
-End-to-end tests are separate from the unit tests: `bin/e2e-http.sh` boots a real site and checks the public unsubscribe endpoint over HTTP. CI runs the unit tests in the `unit-tests` job matrix and the end-to-end tests in the `e2e-tests` job matrix.
+End-to-end tests are separate from the unit tests: `bin/e2e-http.sh` boots a real site and checks the public unsubscribe endpoint over HTTP. CI runs both against the latest WordPress and WooCommerce on PHP 8.4 (`unit-tests` and `e2e-tests` jobs).
 
 ### Releasing
 

@@ -49,18 +49,14 @@ curl --fail --silent --show-error --location --retry 3 -o "$WORK/wp-cli.phar" \
 
 mysql --host=127.0.0.1 --user=root --execute="DROP DATABASE IF EXISTS $DB; CREATE DATABASE $DB"
 
-# E2E_WP_VERSION: a version number, or "latest" (default).
-if [ -n "${E2E_WP_VERSION:-}" ] && [ "$E2E_WP_VERSION" != "latest" ]; then
-	wp core download --quiet --version="$E2E_WP_VERSION"
-else
-	wp core download --quiet
-fi
+wp core download --quiet
 wp config create --dbname="$DB" --dbuser=root --dbpass= --dbhost=127.0.0.1 --skip-check --quiet
 wp core install --url="$BASE" --title="E2E" --admin_user=admin --admin_password=admin \
 	--admin_email=admin@example.com --skip-email --quiet
 
 mkdir -p "$SITE/wp-content/mu-plugins"
 cp "$ROOT/tests/stubs/wpforms.php" "$SITE/wp-content/mu-plugins/mlp-wpforms-stub.php"
+wp plugin install woocommerce --activate --quiet
 ln -s "$ROOT" "$SITE/wp-content/plugins/mailinglist-plugin"
 wp plugin activate mailinglist-plugin
 
