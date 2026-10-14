@@ -1023,6 +1023,24 @@ class MLP_Admin {
 					</tr>
 				</table>
 
+				<h2><?php esc_html_e( 'Email header and footer', 'mailinglist-plugin' ); ?></h2>
+				<table class="form-table" role="presentation">
+					<tr>
+						<th scope="row"><label for="mlp_company_name"><?php esc_html_e( 'Company name', 'mailinglist-plugin' ); ?></label></th>
+						<td>
+							<input type="text" id="mlp_company_name" name="settings[company_name]" class="regular-text" value="<?php echo esc_attr( $s['company_name'] ); ?>" placeholder="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>">
+							<p class="description"><?php esc_html_e( 'Shown in the copyright line of the email footer. Defaults to the site title.', 'mailinglist-plugin' ); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="mlp_address"><?php esc_html_e( 'Postal address', 'mailinglist-plugin' ); ?></label></th>
+						<td>
+							<textarea id="mlp_address" name="settings[address]" rows="3" class="large-text"><?php echo esc_textarea( $s['address'] ); ?></textarea>
+							<p class="description"><?php esc_html_e( 'Shown in the email footer. Leave empty to use the WooCommerce store address. The header shows the logo set in Appearance &rarr; Customize &rarr; Site Identity. Neither is added to emails you supply as a complete HTML document.', 'mailinglist-plugin' ); ?></p>
+						</td>
+					</tr>
+				</table>
+
 				<h2><?php esc_html_e( 'Marketing Email footer', 'mailinglist-plugin' ); ?></h2>
 				<table class="form-table" role="presentation">
 					<tr>

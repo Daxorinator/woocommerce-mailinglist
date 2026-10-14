@@ -95,13 +95,105 @@ class MLP_Mailer {
 			$html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . esc_html( $subject ) . '</title></head>'
 				. '<body style="margin:0;padding:0;background-color:#f5f5f5;">'
 				. '<div style="max-width:640px;margin:0 auto;padding:24px;background-color:#ffffff;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#222222;">'
+				. self::header_html( $site_name )
 				. $body . $footer
+				. self::site_footer_html( $site_name )
 				. '</div></body></html>';
 		}
 
 		$html = apply_filters( 'mlp_email_html', $html, $campaign, $email );
 
 		return array( $subject, $html, self::html_to_text( $html ) );
+	}
+
+	/**
+	 * Centered logo header for the default wrapper.
+	 *
+	 * Uses the theme's custom logo, falling back to the site title as text.
+	 *
+	 * @param string $site_name Site title.
+	 * @return string
+	 */
+	private static function header_html( $site_name ) {
+		$logo_id = (int) get_theme_mod( 'custom_logo' );
+		$src     = $logo_id ? wp_get_attachment_image_url( $logo_id, 'full' ) : '';
+		$src     = apply_filters( 'mlp_email_logo_url', $src ? $src : '' );
+
+		if ( $src ) {
+			$inner = '<img src="' . esc_url( $src ) . '" alt="' . esc_attr( $site_name ) . '" style="display:inline-block;max-width:200px;max-height:80px;width:auto;height:auto;border:0;">';
+		} else {
+			$inner = '<span style="font-size:22px;font-weight:bold;color:#222222;">' . esc_html( $site_name ) . '</span>';
+		}
+
+		return '<div style="text-align:center;padding-bottom:20px;margin-bottom:24px;border-bottom:1px solid #dddddd;">'
+			. '<a href="' . esc_url( home_url( '/' ) ) . '" style="text-decoration:none;">' . $inner . '</a></div>';
+	}
+
+	/**
+	 * Standard footer: copyright, company name, website and postal address.
+	 *
+	 * Company name and address come from the plugin settings, falling back to
+	 * the site title and the WooCommerce store address.
+	 *
+	 * @param string $site_name Site title.
+	 * @return string
+	 */
+	private static function site_footer_html( $site_name ) {
+		$company = trim( (string) MLP_Settings::get( 'company_name' ) );
+		$address = trim( (string) MLP_Settings::get( 'address' ) );
+
+		if ( '' === $company ) {
+			$company = $site_name;
+		}
+		if ( '' === $address ) {
+			$address = self::store_address();
+		}
+
+		$lines   = array();
+		$lines[] = esc_html(
+			sprintf(
+				/* translators: 1: year, 2: company name */
+				__( '© %1$s %2$s', 'mailinglist-plugin' ),
+				wp_date( 'Y' ),
+				$company
+			)
+		);
+		$lines[] = '<a href="' . esc_url( home_url( '/' ) ) . '" style="color:#777777;">' . esc_html( preg_replace( '~^https?://~i', '', untrailingslashit( home_url() ) ) ) . '</a>';
+		if ( '' !== $address ) {
+			$lines[] = nl2br( esc_html( $address ), false );
+		}
+
+		return '<div style="margin-top:32px;padding-top:16px;border-top:1px solid #dddddd;text-align:center;font-size:12px;line-height:1.6;color:#777777;">'
+			. implode( '<br>', $lines )
+			. '</div>';
+	}
+
+	/**
+	 * The WooCommerce store address as a single line, or '' if not set.
+	 *
+	 * @return string
+	 */
+	private static function store_address() {
+		$parts = array(
+			get_option( 'woocommerce_store_address' ),
+			get_option( 'woocommerce_store_address_2' ),
+			get_option( 'woocommerce_store_city' ),
+			get_option( 'woocommerce_store_postcode' ),
+		);
+
+		$country = (string) get_option( 'woocommerce_default_country' );
+		if ( '' !== $country ) {
+			$code = explode( ':', $country );
+			if ( function_exists( 'WC' ) && WC()->countries ) {
+				$countries = WC()->countries->get_countries();
+				$parts[]   = isset( $countries[ $code[0] ] ) ? $countries[ $code[0] ] : $code[0];
+			} else {
+				$parts[] = $code[0];
+			}
+		}
+
+		$parts = array_filter( array_map( 'trim', array_map( 'strval', $parts ) ) );
+		return implode( ', ', $parts );
 	}
 
 	/**
