@@ -104,6 +104,15 @@ jQuery( function ( $ ) {
 		return editor ? editor.getContent() : $( '#mlp_body_visual' ).val();
 	}
 
+	function setVisual( value ) {
+		var editor = visualEditor();
+		if ( editor ) {
+			editor.setContent( value );
+		} else {
+			$( '#mlp_body_visual' ).val( value );
+		}
+	}
+
 	function getHtml() {
 		return codeMirror ? codeMirror.getValue() : $( '#mlp_body_html' ).val();
 	}
@@ -116,12 +125,19 @@ jQuery( function ( $ ) {
 		}
 	}
 
+	var currentFormat = format();
+
 	function toggleFormat() {
 		var isHtml = format() === 'html';
 
-		// Carry the content across the first time, so switching modes does not lose work.
-		if ( isHtml && $.trim( getHtml() ) === '' ) {
-			setHtml( getVisual() );
+		// The two editors are views of the same content: copy across on every switch.
+		if ( format() !== currentFormat ) {
+			if ( isHtml ) {
+				setHtml( getVisual() );
+			} else {
+				setVisual( getHtml() );
+			}
+			currentFormat = format();
 		}
 
 		$( '#mlp-editor-visual' ).toggle( ! isHtml );

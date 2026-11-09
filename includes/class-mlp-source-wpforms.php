@@ -185,6 +185,80 @@ class MLP_Source_WPForms {
 	}
 
 	/**
+	 * Create a form entry holding one address, so it joins every list sourced from the form.
+	 *
+	 * @param array  $config Marketing list configuration (form_id, email_field, name_field).
+	 * @param string $email  Normalised email.
+	 * @param string $name   Display name.
+	 * @return int|WP_Error Entry ID.
+	 */
+	public static function create_entry( $config, $email, $name = '' ) {
+		global $wpdb;
+
+		$form_id = isset( $config['form_id'] ) ? (int) $config['form_id'] : 0;
+		if ( ! $form_id || ! self::has_entry_storage() ) {
+			return new WP_Error( 'mlp_no_entries', __( 'WPForms entry storage was not found. Storing form entries requires WPForms Pro to be active.', 'mailinglist-plugin' ) );
+		}
+
+		$email_field = isset( $config['email_field'] ) ? (string) $config['email_field'] : '';
+		$name_field  = isset( $config['name_field'] ) ? (string) $config['name_field'] : '';
+		$form_fields = self::get_form_fields( $form_id );
+
+		if ( '' === $email_field ) {
+			foreach ( $form_fields as $field ) {
+				if ( 'email' === $field['type'] ) {
+					$email_field = $field['id'];
+					break;
+				}
+			}
+		}
+		if ( '' === $email_field ) {
+			return new WP_Error( 'mlp_no_email_field', __( 'The form has no email field to store addresses in.', 'mailinglist-plugin' ) );
+		}
+
+		$types  = wp_list_pluck( $form_fields, 'type', 'id' );
+		$labels = wp_list_pluck( $form_fields, 'label', 'id' );
+		$fields = array(
+			$email_field => array(
+				'name'  => isset( $labels[ $email_field ] ) ? $labels[ $email_field ] : 'Email',
+				'value' => $email,
+				'id'    => (int) $email_field,
+				'type'  => isset( $types[ $email_field ] ) ? $types[ $email_field ] : 'email',
+			),
+		);
+		if ( '' !== $name_field && $name_field !== $email_field && '' !== $name ) {
+			$fields[ $name_field ] = array(
+				'name'  => isset( $labels[ $name_field ] ) ? $labels[ $name_field ] : 'Name',
+				'value' => $name,
+				'id'    => (int) $name_field,
+				'type'  => isset( $types[ $name_field ] ) ? $types[ $name_field ] : 'name',
+			);
+		}
+
+		$now = gmdate( 'Y-m-d H:i:s' );
+		$row = array(
+			'form_id'       => $form_id,
+			'status'        => '',
+			'type'          => '',
+			'fields'        => wp_json_encode( $fields ),
+			'meta'          => '',
+			'ip_address'    => '',
+			'user_agent'    => '',
+			'date'          => $now,
+			'date_modified' => $now,
+		);
+
+		// Only write columns this WPForms version has.
+		$columns = (array) $wpdb->get_col( 'SHOW COLUMNS FROM ' . self::entries_table() ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		$row     = array_intersect_key( $row, array_flip( $columns ) );
+
+		if ( ! $wpdb->insert( self::entries_table(), $row ) ) {
+			return new WP_Error( 'mlp_entry', __( 'Could not create a WPForms entry.', 'mailinglist-plugin' ) );
+		}
+		return (int) $wpdb->insert_id;
+	}
+
+	/**
 	 * IDs of every entry of a form that was submitted with the given email address.
 	 *
 	 * @param int    $form_id    Form ID.

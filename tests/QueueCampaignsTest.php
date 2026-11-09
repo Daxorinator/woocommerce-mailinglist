@@ -193,4 +193,39 @@ class QueueCampaignsTest extends MLP_TestCase {
 		$this->assertNotFalse( as_next_scheduled_action( MLP_Queue::HOOK, array(), MLP_Queue::GROUP ) );
 		MLP_Queue::unschedule();
 	}
+
+	public function test_send_to_remaining_queues_only_people_not_yet_sent_it() {
+		$id = $this->draft();
+		MLP_Campaigns::start( $id );
+		MLP_Queue::process();
+		$this->assertSame( 'sent', MLP_Campaigns::get( $id )->status );
+
+		$this->make_entry( $this->form_id, 'Dan', 'dan@example.com' );
+		$this->assertSame( 0, MLP_Campaigns::remaining_count( $id ) ); // Not on the list until it is refreshed.
+
+		$queued = MLP_Campaigns::send_to_remaining( $id );
+
+		$this->assertSame( 1, $queued );
+		$campaign = MLP_Campaigns::get( $id );
+		$this->assertSame( 'sending', $campaign->status );
+		$this->assertSame( 4, (int) $campaign->total );
+		$this->assertSame( 0, MLP_Campaigns::remaining_count( $id ) );
+
+		MLP_Queue::process();
+		$this->assertSame( 'sent', MLP_Campaigns::get( $id )->status );
+		$this->assertSame( 4, (int) MLP_Campaigns::get( $id )->sent );
+	}
+
+	public function test_send_to_remaining_does_nothing_when_everyone_has_been_sent_it() {
+		$id = $this->draft();
+		MLP_Campaigns::start( $id );
+		MLP_Queue::process();
+
+		$this->assertSame( 0, MLP_Campaigns::send_to_remaining( $id ) );
+		$this->assertSame( 'sent', MLP_Campaigns::get( $id )->status );
+	}
+
+	public function test_send_to_remaining_needs_a_sent_email() {
+		$this->assertWPError( MLP_Campaigns::send_to_remaining( $this->draft() ) );
+	}
 }

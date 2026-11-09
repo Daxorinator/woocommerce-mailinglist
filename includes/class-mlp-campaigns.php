@@ -167,6 +167,77 @@ class MLP_Campaigns {
 	}
 
 	/**
+	 * Current list members who have no delivery row (other than a cancelled one) for a campaign.
+	 *
+	 * Failed recipients count as attempted; use "Retry failed" for those.
+	 */
+	public static function remaining_count( $id ) {
+		global $wpdb;
+		$campaign = self::get( $id );
+		if ( ! $campaign ) {
+			return 0;
+		}
+		$queue   = MLP_DB::table( 'queue' );
+		$members = MLP_DB::table( 'members' );
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$members} m WHERE m.list_id = %d AND NOT EXISTS ( SELECT 1 FROM {$queue} q WHERE q.campaign_id = %d AND q.email = m.email AND q.status <> 'cancelled' )", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$campaign->list_id,
+				$id
+			)
+		);
+	}
+
+	/**
+	 * Send an already-sent email to everyone on its list who has not been sent it.
+	 *
+	 * The list is refreshed first. Recipients who already received it (or are waiting, or failed) are skipped.
+	 *
+	 * @param int $id Campaign ID.
+	 * @return int|WP_Error Number of recipients queued.
+	 */
+	public static function send_to_remaining( $id ) {
+		global $wpdb;
+
+		$campaign = self::get( $id );
+		if ( ! $campaign || ! in_array( $campaign->status, array( 'sent', 'sending' ), true ) ) {
+			return new WP_Error( 'mlp_not_sent', __( 'Only an email that has been sent can be sent to remaining recipients.', 'mailinglist-plugin' ) );
+		}
+		$list = MLP_Lists::get( $campaign->list_id );
+		if ( ! $list ) {
+			return new WP_Error( 'mlp_no_list', __( 'This email\'s mailing list no longer exists.', 'mailinglist-plugin' ) );
+		}
+
+		$refresh = MLP_Refresher::refresh_list( $list );
+		if ( is_wp_error( $refresh ) ) {
+			return $refresh;
+		}
+
+		$queue   = MLP_DB::table( 'queue' );
+		$members = MLP_DB::table( 'members' );
+		$added   = (int) $wpdb->query(
+			$wpdb->prepare(
+				"INSERT INTO {$queue} (campaign_id, email, name, status) SELECT %d, m.email, m.name, 'pending' FROM {$members} m WHERE m.list_id = %d AND NOT EXISTS ( SELECT 1 FROM {$queue} q WHERE q.campaign_id = %d AND q.email = m.email AND q.status <> 'cancelled' ) ORDER BY m.id ASC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$id,
+				$list->id,
+				$id
+			)
+		);
+
+		if ( $added ) {
+			$wpdb->query(
+				$wpdb->prepare(
+					'UPDATE ' . MLP_DB::table( 'campaigns' ) . " SET status = 'sending', completed_at = NULL, total = total + %d WHERE id = %d", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+					$added,
+					$id
+				)
+			);
+			MLP_Queue::schedule( 0 );
+		}
+		return $added;
+	}
+
+	/**
 	 * Stop a campaign that is still sending. Emails already sent stay sent.
 	 */
 	public static function cancel( $id ) {

@@ -197,4 +197,110 @@ class MLP_Lists {
 		$sql .= $wpdb->prepare( ' ORDER BY email ASC LIMIT %d OFFSET %d', $per_page, max( 0, ( $page - 1 ) * $per_page ) );
 		return (array) $wpdb->get_results( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
+
+	/**
+	 * Members of one list whose address is not on another.
+	 *
+	 * @param int $source_id List to copy from.
+	 * @param int $target_id List to copy into.
+	 * @param int $after_id  Only members with a greater row ID (for paging).
+	 * @param int $limit     Maximum rows.
+	 * @return object[] Each: id, email, name.
+	 */
+	public static function missing_members( $source_id, $target_id, $after_id = 0, $limit = 500 ) {
+		global $wpdb;
+		$members = MLP_DB::table( 'members' );
+		return (array) $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT s.id, s.email, s.name FROM {$members} s WHERE s.list_id = %d AND s.id > %d AND NOT EXISTS ( SELECT 1 FROM {$members} t WHERE t.list_id = %d AND t.email = s.email ) ORDER BY s.id ASC LIMIT %d", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$source_id,
+				$after_id,
+				$target_id,
+				$limit
+			)
+		);
+	}
+
+	/**
+	 * How many members of the source are not yet on the target.
+	 */
+	public static function count_missing( $source_id, $target_id ) {
+		global $wpdb;
+		$members = MLP_DB::table( 'members' );
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT COUNT(*) FROM {$members} s WHERE s.list_id = %d AND NOT EXISTS ( SELECT 1 FROM {$members} t WHERE t.list_id = %d AND t.email = s.email )", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$source_id,
+				$target_id
+			)
+		);
+	}
+
+	/**
+	 * One-off copy of a list's recipients into a marketing list.
+	 *
+	 * Each address not already on the target becomes a new entry in the target's WPForms form,
+	 * so it lasts through refreshes and unsubscribing removes it from marketing only. The source
+	 * list is untouched, so the person still receives its emails.
+	 *
+	 * @param int $source_id List to copy from.
+	 * @param int $target_id Marketing list to copy into.
+	 * @return array|WP_Error [ added, already_on_list ].
+	 */
+	public static function merge( $source_id, $target_id ) {
+		if ( function_exists( 'set_time_limit' ) ) {
+			@set_time_limit( 0 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		}
+
+		$source = self::get( (int) $source_id );
+		$target = self::get( (int) $target_id );
+		if ( ! $source || ! $target ) {
+			return new WP_Error( 'mlp_merge_missing', __( 'Mailing list not found.', 'mailinglist-plugin' ) );
+		}
+		if ( $source->id === $target->id ) {
+			return new WP_Error( 'mlp_merge_same', __( 'Choose a different list to merge into.', 'mailinglist-plugin' ) );
+		}
+		if ( self::TYPE_MARKETING !== $target->type ) {
+			return new WP_Error( 'mlp_merge_type', __( 'Recipients can only be merged into a Marketing Email list.', 'mailinglist-plugin' ) );
+		}
+
+		// Both lists must be current, or addresses already on the target could be added twice.
+		$refresh = MLP_Refresher::refresh_list( $target );
+		if ( is_wp_error( $refresh ) ) {
+			return $refresh;
+		}
+		$refresh = MLP_Refresher::refresh_list( $source );
+		if ( is_wp_error( $refresh ) ) {
+			return $refresh;
+		}
+
+		$added   = 0;
+		$last_id = 0;
+		$error   = null;
+
+		do {
+			$rows  = self::missing_members( $source->id, $target->id, $last_id );
+			$fetch = count( $rows );
+			foreach ( $rows as $row ) {
+				$last_id = (int) $row->id;
+				$entry   = MLP_Source_WPForms::create_entry( $target->config, $row->email, $row->name );
+				if ( is_wp_error( $entry ) ) {
+					$error = $entry;
+					break 2;
+				}
+				++$added;
+			}
+		} while ( 500 === $fetch );
+
+		// Bring the new entries onto the target list (also after a partial run).
+		MLP_Refresher::refresh_list( $target );
+
+		if ( $error ) {
+			return $error;
+		}
+		return array(
+			'added'           => $added,
+			'already_on_list' => max( 0, self::count_members( $source->id ) - $added ),
+		);
+	}
 }

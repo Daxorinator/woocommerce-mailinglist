@@ -11,7 +11,7 @@ class MLP_Admin {
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'assets' ), 20 );
 		add_action( 'admin_notices', array( __CLASS__, 'render_notice' ) );
 
-		foreach ( array( 'save_list', 'delete_list', 'refresh_list', 'save_campaign', 'campaign_action', 'save_settings' ) as $action ) {
+		foreach ( array( 'save_list', 'delete_list', 'refresh_list', 'merge_list', 'save_campaign', 'campaign_action', 'save_settings' ) as $action ) {
 			add_action( 'admin_post_mlp_' . $action, array( __CLASS__, 'handle_' . $action ) );
 		}
 		foreach ( array( 'form_fields', 'preview', 'send_test' ) as $action ) {
@@ -154,6 +154,10 @@ class MLP_Admin {
 			self::page_members( absint( $_GET['members'] ) );
 			return;
 		}
+		if ( isset( $_GET['merge'] ) ) {
+			self::page_merge( absint( $_GET['merge'] ) );
+			return;
+		}
 		// phpcs:enable
 
 		$lists = MLP_Lists::all();
@@ -186,6 +190,7 @@ class MLP_Admin {
 								<span><a href="<?php echo esc_url( self::url( 'mlp-list-edit', array( 'list' => $list->id ) ) ); ?>"><?php esc_html_e( 'Edit', 'mailinglist-plugin' ); ?></a> | </span>
 								<span><a href="<?php echo esc_url( self::url( 'mlp-lists', array( 'members' => $list->id ) ) ); ?>"><?php esc_html_e( 'View recipients', 'mailinglist-plugin' ); ?></a> | </span>
 								<span><a href="<?php echo esc_url( self::action_url( 'refresh_list', array( 'list' => $list->id ) ) ); ?>"><?php esc_html_e( 'Refresh now', 'mailinglist-plugin' ); ?></a> | </span>
+								<span><a href="<?php echo esc_url( self::url( 'mlp-lists', array( 'merge' => $list->id ) ) ); ?>"><?php esc_html_e( 'Merge into…', 'mailinglist-plugin' ); ?></a> | </span>
 								<span><a href="<?php echo esc_url( self::url( 'mlp-compose', array( 'list' => $list->id ) ) ); ?>"><?php esc_html_e( 'Send email', 'mailinglist-plugin' ); ?></a> | </span>
 								<span class="delete"><a href="<?php echo esc_url( self::action_url( 'delete_list', array( 'list' => $list->id ) ) ); ?>" class="mlp-confirm" data-confirm="<?php esc_attr_e( 'Delete this mailing list? Emails still being sent to it will be cancelled.', 'mailinglist-plugin' ); ?>"><?php esc_html_e( 'Delete', 'mailinglist-plugin' ); ?></a></span>
 							</div>
@@ -479,6 +484,81 @@ class MLP_Admin {
 		self::redirect( self::url( 'mlp-lists' ) );
 	}
 
+	private static function page_merge( $source_id ) {
+		$source  = MLP_Lists::get( $source_id );
+		$targets = array_filter(
+			MLP_Lists::all( MLP_Lists::TYPE_MARKETING ),
+			function ( $list ) use ( $source_id ) {
+				return $list->id !== $source_id;
+			}
+		);
+		if ( ! $source ) {
+			echo '<div class="wrap"><p>' . esc_html__( 'Mailing list not found.', 'mailinglist-plugin' ) . '</p></div>';
+			return;
+		}
+		?>
+		<div class="wrap">
+			<h1>
+				<?php
+				/* translators: %s: list name */
+				echo esc_html( sprintf( __( 'Merge recipients: %s', 'mailinglist-plugin' ), $source->name ) );
+				?>
+			</h1>
+			<p><a href="<?php echo esc_url( self::url( 'mlp-lists' ) ); ?>">&larr; <?php esc_html_e( 'All lists', 'mailinglist-plugin' ); ?></a></p>
+			<p><?php esc_html_e( 'Adds every recipient of this list who is not already on the chosen Marketing Email list, as a new entry in that list\'s WPForms form. This is a one-off copy: this list is not changed, so people keep receiving its emails, and if they later unsubscribe from marketing emails they are removed from the Marketing list only. Addresses already on the Marketing list are skipped, so nothing is duplicated.', 'mailinglist-plugin' ); ?></p>
+			<p><strong><?php esc_html_e( 'Make sure you have a lawful basis to send marketing email to these people.', 'mailinglist-plugin' ); ?></strong></p>
+			<?php if ( ! $targets ) : ?>
+				<p><?php esc_html_e( 'There is no Marketing Email list to merge into.', 'mailinglist-plugin' ); ?></p>
+			<?php else : ?>
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<input type="hidden" name="action" value="mlp_merge_list">
+					<input type="hidden" name="source" value="<?php echo esc_attr( $source->id ); ?>">
+					<?php wp_nonce_field( 'mlp_merge_list' ); ?>
+					<table class="widefat striped" style="max-width:720px">
+						<thead><tr><th style="width:30px"></th><th><?php esc_html_e( 'Merge into', 'mailinglist-plugin' ); ?></th><th><?php esc_html_e( 'New recipients (as of last refresh)', 'mailinglist-plugin' ); ?></th></tr></thead>
+						<tbody>
+						<?php foreach ( $targets as $target ) : ?>
+							<tr>
+								<td><input type="radio" name="target" value="<?php echo esc_attr( $target->id ); ?>" id="mlp-target-<?php echo esc_attr( $target->id ); ?>" required></td>
+								<td><label for="mlp-target-<?php echo esc_attr( $target->id ); ?>"><?php echo esc_html( $target->name ); ?></label></td>
+								<td><?php echo esc_html( number_format_i18n( MLP_Lists::count_missing( $source->id, $target->id ) ) ); ?></td>
+							</tr>
+						<?php endforeach; ?>
+						</tbody>
+					</table>
+					<p class="submit"><button type="submit" class="button button-primary"><?php esc_html_e( 'Merge recipients', 'mailinglist-plugin' ); ?></button></p>
+				</form>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+
+	public static function handle_merge_list() {
+		self::require_capability();
+		check_admin_referer( 'mlp_merge_list' );
+
+		$source = isset( $_POST['source'] ) ? absint( $_POST['source'] ) : 0;
+		$target = isset( $_POST['target'] ) ? absint( $_POST['target'] ) : 0;
+
+		$result = MLP_Lists::merge( $source, $target );
+		if ( is_wp_error( $result ) ) {
+			self::notice( $result->get_error_message(), 'error' );
+			self::redirect( self::url( 'mlp-lists', array( 'merge' => $source ) ) );
+		}
+
+		$list = MLP_Lists::get( $target );
+		self::notice(
+			sprintf(
+				/* translators: 1: number added, 2: number skipped, 3: list name */
+				__( 'Merged: %1$s recipient(s) added to "%3$s"; %2$s were already on it.', 'mailinglist-plugin' ),
+				number_format_i18n( $result['added'] ),
+				number_format_i18n( $result['already_on_list'] ),
+				$list ? $list->name : ''
+			)
+		);
+		self::redirect( self::url( 'mlp-lists' ) );
+	}
+
 	public static function handle_refresh_list() {
 		self::require_capability();
 		check_admin_referer( 'mlp_refresh_list' );
@@ -586,7 +666,7 @@ class MLP_Admin {
 							<div id="mlp-editor-visual">
 								<?php
 								wp_editor(
-									'visual' === $format ? $body : '',
+									$body,
 									'mlp_body_visual',
 									array(
 										'textarea_name' => 'mlp_body_visual',
@@ -597,7 +677,7 @@ class MLP_Admin {
 								?>
 							</div>
 							<div id="mlp-editor-html" style="display:none">
-								<textarea id="mlp_body_html" name="mlp_body_html" rows="22" class="large-text code" spellcheck="false"><?php echo esc_textarea( 'html' === $format ? $body : '' ); ?></textarea>
+								<textarea id="mlp_body_html" name="mlp_body_html" rows="22" class="large-text code" spellcheck="false"><?php echo esc_textarea( $body ); ?></textarea>
 								<p class="description"><?php esc_html_e( 'Sent exactly as written. Paste a complete HTML document (with its own <html> and <style>) or just a fragment, which is placed in a simple responsive wrapper.', 'mailinglist-plugin' ); ?></p>
 							</div>
 
@@ -914,6 +994,31 @@ class MLP_Admin {
 				<tr><th><?php esc_html_e( 'Finished', 'mailinglist-plugin' ); ?></th><td><?php echo esc_html( mlp_format_date( $campaign->completed_at ) ); ?></td></tr>
 			</table>
 
+			<?php if ( in_array( $campaign->status, array( 'sent', 'sending' ), true ) ) : ?>
+				<?php $remaining = MLP_Campaigns::remaining_count( $campaign->id ); ?>
+				<h2><?php esc_html_e( 'Remaining recipients', 'mailinglist-plugin' ); ?></h2>
+				<p>
+					<?php
+					/* translators: %s: number of recipients */
+					echo esc_html( sprintf( _n( '%s person on the list has not been sent this email.', '%s people on the list have not been sent this email.', $remaining, 'mailinglist-plugin' ), number_format_i18n( $remaining ) ) );
+					?>
+					<?php esc_html_e( '(Based on the last refresh; the list is refreshed again when you send.)', 'mailinglist-plugin' ); ?>
+				</p>
+				<p><a class="button button-primary mlp-confirm" data-confirm="<?php esc_attr_e( 'Send this email to everyone on the list who has not yet been sent it?', 'mailinglist-plugin' ); ?>" href="
+				<?php
+				echo esc_url(
+					self::action_url(
+						'campaign_action',
+						array(
+							'do'       => 'remaining',
+							'campaign' => $campaign->id,
+						)
+					)
+				);
+				?>
+																				"><?php esc_html_e( 'Send to remaining recipients', 'mailinglist-plugin' ); ?></a></p>
+			<?php endif; ?>
+
 			<?php if ( $failed ) : ?>
 				<h2><?php esc_html_e( 'Failed recipients', 'mailinglist-plugin' ); ?></h2>
 				<p><a class="button" href="
@@ -964,6 +1069,17 @@ class MLP_Admin {
 				$count = MLP_Campaigns::retry_failed( $id );
 				/* translators: %s: number of recipients */
 				self::notice( sprintf( __( '%s failed recipient(s) queued again.', 'mailinglist-plugin' ), number_format_i18n( $count ) ) );
+				break;
+
+			case 'remaining':
+				$queued = MLP_Campaigns::send_to_remaining( $id );
+				if ( is_wp_error( $queued ) ) {
+					self::notice( $queued->get_error_message(), 'error' );
+				} else {
+					/* translators: %s: number of recipients */
+					self::notice( sprintf( __( 'Sending to %s remaining recipient(s).', 'mailinglist-plugin' ), number_format_i18n( $queued ) ) );
+				}
+				self::redirect( self::url( 'mlp-campaigns', array( 'view' => $id ) ) );
 				break;
 
 			case 'duplicate':
