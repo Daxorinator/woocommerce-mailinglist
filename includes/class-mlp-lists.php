@@ -264,6 +264,31 @@ class MLP_Lists {
 			return new WP_Error( 'mlp_merge_type', __( 'Recipients can only be merged into a Marketing Email list.', 'mailinglist-plugin' ) );
 		}
 
+		// Two merges at once (e.g. a double click) would each add the same addresses.
+		if ( ! self::acquire_merge_lock() ) {
+			return new WP_Error( 'mlp_merge_busy', __( 'A merge is already running. Wait for it to finish, then check the recipient count.', 'mailinglist-plugin' ) );
+		}
+		$result = self::merge_locked( $source, $target );
+		delete_option( self::MERGE_LOCK );
+		return $result;
+	}
+
+	const MERGE_LOCK = 'mlp_merge_lock';
+
+	private static function acquire_merge_lock() {
+		// add_option() is atomic: only one caller can create the row.
+		if ( add_option( self::MERGE_LOCK, time(), '', false ) ) {
+			return true;
+		}
+		// Take over a lock left behind by a request that died.
+		if ( (int) get_option( self::MERGE_LOCK ) < time() - 15 * MINUTE_IN_SECONDS ) {
+			delete_option( self::MERGE_LOCK );
+			return add_option( self::MERGE_LOCK, time(), '', false );
+		}
+		return false;
+	}
+
+	private static function merge_locked( $source, $target ) {
 		// Both lists must be current, or addresses already on the target could be added twice.
 		$refresh = MLP_Refresher::refresh_list( $target );
 		if ( is_wp_error( $refresh ) ) {
