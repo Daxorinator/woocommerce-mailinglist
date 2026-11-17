@@ -72,4 +72,15 @@ class MergeTest extends MLP_TestCase {
 		$this->assertWPError( MLP_Lists::merge( $this->source_id, $product ) );
 		$this->assertWPError( MLP_Lists::merge( $this->source_id, $this->source_id ) );
 	}
+
+	public function test_a_second_merge_while_one_is_running_is_refused_and_adds_nothing() {
+		add_option( MLP_Lists::MERGE_LOCK, time(), '', false );
+
+		$result = MLP_Lists::merge( $this->source_id, $this->target_id );
+
+		$this->assertWPError( $result );
+		$this->assertSame( 'ann@example.com', $this->emails( $this->target_id ) );
+		delete_option( MLP_Lists::MERGE_LOCK );
+		$this->assertNotWPError( MLP_Lists::merge( $this->source_id, $this->target_id ) );
+	}
 }
